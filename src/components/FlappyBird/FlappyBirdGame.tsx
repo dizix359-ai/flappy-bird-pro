@@ -114,22 +114,27 @@ export const FlappyBirdGame = () => {
 
   return (
     <div className="game-container">
-      <div className="relative" style={{ width: dimensions.width, height: dimensions.height }}>
-        {/* Background canvas always visible */}
-        <div 
-          className="absolute inset-0 rounded-2xl overflow-hidden"
-          style={{ 
-            background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
-          }}
-        />
-        
+      <div 
+        className="relative rounded-2xl overflow-hidden"
+        style={{ 
+          width: dimensions.width, 
+          height: dimensions.height,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+        }}
+      >
         {gameState.status === 'menu' ? (
-          <DifficultyMenu 
-            onSelect={handleSelectDifficulty} 
-            highScores={highScores}
-          />
+          // Menu with background
+          <div 
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)' }}
+          >
+            <DifficultyMenu 
+              onSelect={handleSelectDifficulty} 
+              highScores={highScores}
+            />
+          </div>
         ) : (
+          // Game canvas and UI
           <>
             <GameCanvas
               width={dimensions.width}
