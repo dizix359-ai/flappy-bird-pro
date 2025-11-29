@@ -26,20 +26,21 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
   }
 
   if (gameState.status === 'idle') {
+    // UI is overlay but allows touches to pass through to canvas
     return (
       <div 
-        className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4 z-10"
+        className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4 z-10 pointer-events-none"
         style={{ width: canvasWidth, height: canvasHeight }}
       >
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
+        <div className="bg-black/40 backdrop-blur-sm rounded-xl px-6 py-5 text-center pointer-events-none">
           <p className="text-lg md:text-xl text-white font-bold mb-2" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
             {difficultyLabel}
           </p>
-          <p className="text-base text-white/90" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
-            اضغط للبدء!
+          <p className="text-base md:text-lg text-white" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+            👆 اضغط للبدء!
           </p>
-          <p className="text-xs text-white/70 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
-            Tap to Start
+          <p className="text-xs text-white/70 mt-2" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+            Tap anywhere to Start
           </p>
         </div>
 
@@ -48,7 +49,7 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
             e.stopPropagation();
             onBackToMenu();
           }}
-          className="text-sm text-white/70 underline hover:text-white transition-colors pointer-events-auto bg-black/20 px-4 py-2 rounded-lg"
+          className="text-sm text-white/80 underline hover:text-white transition-colors pointer-events-auto bg-black/30 px-4 py-2 rounded-lg active:scale-95"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
           ← تغيير المستوى
@@ -66,7 +67,7 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
         style={{ 
           width: canvasWidth, 
           height: canvasHeight,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(4px)'
         }}
       >
@@ -94,14 +95,14 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
         <div className="flex flex-col gap-3 w-full max-w-[220px]">
           <button
             onClick={onRestart}
-            className="game-button text-sm py-3"
+            className="game-button text-sm py-3 active:scale-95"
           >
             🔄 العب مرة أخرى
           </button>
           
           <button
             onClick={onBackToMenu}
-            className="text-sm text-white/70 underline hover:text-white transition-colors bg-black/20 px-4 py-2 rounded-lg"
+            className="text-sm text-white/70 underline hover:text-white transition-colors bg-black/20 px-4 py-2 rounded-lg active:scale-95"
           >
             ← القائمة الرئيسية
           </button>
