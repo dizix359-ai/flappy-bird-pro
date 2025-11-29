@@ -36,21 +36,18 @@
 
     --radius: 1rem;
 
-    /* Game specific colors */
+    /* Game colors */
     --sky-top: 197 80% 75%;
     --sky-bottom: 197 60% 85%;
     --pipe-main: 120 50% 35%;
-    --pipe-highlight: 120 45% 50%;
-    --pipe-shadow: 120 55% 25%;
     --ground: 30 50% 35%;
-    --ground-top: 120 45% 45%;
     --bird-body: 45 100% 55%;
-    --bird-wing: 25 90% 50%;
-    --bird-beak: 25 100% 50%;
 
     /* Gradients */
     --gradient-sky: linear-gradient(180deg, hsl(var(--sky-top)) 0%, hsl(var(--sky-bottom)) 100%);
     --gradient-button: linear-gradient(180deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+    --gradient-easy: linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(142 60% 55%) 100%);
+    --gradient-hard: linear-gradient(135deg, hsl(0 70% 50%) 0%, hsl(25 90% 55%) 100%);
 
     /* Shadows */
     --shadow-game: 0 8px 32px hsl(220 20% 20% / 0.3);
@@ -60,28 +57,18 @@
   .dark {
     --background: 220 30% 12%;
     --foreground: 197 60% 90%;
-
     --card: 220 25% 18%;
     --card-foreground: 197 60% 90%;
-
-    --popover: 220 25% 18%;
-    --popover-foreground: 197 60% 90%;
-
     --primary: 45 100% 55%;
     --primary-foreground: 220 20% 15%;
-
     --secondary: 120 35% 35%;
     --secondary-foreground: 0 0% 100%;
-
     --muted: 220 20% 25%;
     --muted-foreground: 197 30% 60%;
-
     --accent: 25 90% 55%;
     --accent-foreground: 0 0% 100%;
-
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 220 20% 25%;
     --input: 220 20% 25%;
     --ring: 45 100% 55%;
@@ -93,32 +80,41 @@
     @apply border-border;
   }
 
-  body {
+  html, body {
     @apply bg-background text-foreground;
     font-family: 'Press Start 2P', cursive;
     overflow: hidden;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
     user-select: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+
+  #root {
+    width: 100%;
+    height: 100%;
   }
 }
 
 @layer components {
   .game-container {
-    @apply relative w-full h-screen flex items-center justify-center;
+    @apply relative w-full h-full flex items-center justify-center;
     background: var(--gradient-sky);
   }
 
   .game-canvas {
     @apply rounded-2xl;
     box-shadow: var(--shadow-game);
-    max-width: 100vw;
-    max-height: 100vh;
     touch-action: none;
+    -webkit-touch-callout: none;
   }
 
   .game-button {
-    @apply px-8 py-4 rounded-xl font-bold text-lg transition-all duration-200;
+    @apply px-6 py-3 rounded-xl font-bold transition-all duration-150 active:scale-95;
     background: var(--gradient-button);
     color: hsl(var(--primary-foreground));
     box-shadow: var(--shadow-button);
@@ -134,6 +130,33 @@
     @apply scale-95;
   }
 
+  .difficulty-button {
+    @apply w-full px-5 py-4 rounded-xl font-bold transition-all duration-150 active:scale-95;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .difficulty-button.easy-mode {
+    background: var(--gradient-easy);
+    color: white;
+    box-shadow: 0 4px 16px hsl(142 70% 45% / 0.4);
+  }
+
+  .difficulty-button.easy-mode:hover {
+    box-shadow: 0 6px 24px hsl(142 70% 45% / 0.5);
+    transform: scale(1.02);
+  }
+
+  .difficulty-button.hard-mode {
+    background: var(--gradient-hard);
+    color: white;
+    box-shadow: 0 4px 16px hsl(0 70% 50% / 0.4);
+  }
+
+  .difficulty-button.hard-mode:hover {
+    box-shadow: 0 6px 24px hsl(0 70% 50% / 0.5);
+    transform: scale(1.02);
+  }
+
   .score-display {
     @apply text-4xl font-bold;
     color: hsl(var(--card));
@@ -146,13 +169,13 @@
   }
 
   .game-overlay {
-    @apply absolute inset-0 flex flex-col items-center justify-center gap-6;
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-4 px-4;
     background: hsl(var(--foreground) / 0.5);
     backdrop-filter: blur(4px);
   }
 
   .game-title {
-    @apply text-3xl md:text-5xl font-bold text-center;
+    @apply font-bold text-center;
     color: hsl(var(--primary));
     text-shadow: 
       3px 3px 0 hsl(var(--accent)),
@@ -165,16 +188,6 @@
     50% { transform: translateY(-10px); }
   }
 
-  @keyframes pulse-once {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-  }
-
-  .animate-pulse-once {
-    animation: pulse-once 0.15s ease-out;
-  }
-
   @keyframes float {
     0%, 100% { transform: translateY(0) rotate(-5deg); }
     50% { transform: translateY(-8px) rotate(5deg); }
@@ -182,5 +195,12 @@
 
   .floating {
     animation: float 2s ease-in-out infinite;
+  }
+}
+
+/* Prevent pull-to-refresh and bounce on mobile */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    overscroll-behavior: none;
   }
 }

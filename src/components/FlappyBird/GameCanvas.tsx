@@ -1,16 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Bird, Pipe, GameState, GameConfig } from './types';
+import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS } from './types';
 import { useGameLoop } from './useGameLoop';
-
-// Optimized physics for responsive, satisfying gameplay
-const CONFIG: GameConfig = {
-  gravity: 2200,           // Strong gravity for snappy feel
-  jumpForce: -520,         // Strong immediate jump
-  pipeSpeed: 200,          
-  pipeSpawnInterval: 1.8,  
-  pipeGap: 170,            
-  groundHeight: 80,
-};
 
 const COLORS = {
   skyTop: '#87CEEB',
@@ -22,11 +12,6 @@ const COLORS = {
   ground: '#8B6914',
   groundTop: '#4CAF50',
   groundPattern: '#7CB342',
-  birdBody: '#FFD700',
-  birdWing: '#FFA500',
-  birdBeak: '#FF6600',
-  birdEye: '#FFFFFF',
-  birdPupil: '#000000',
 };
 
 interface GameCanvasProps {
@@ -41,6 +26,8 @@ interface GameCanvasProps {
 export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [scoreFlash, setScoreFlash] = useState(false);
+  const configRef = useRef<GameConfig>(DIFFICULTY_CONFIGS[gameState.difficulty]);
+  
   const birdRef = useRef<Bird>({
     x: width * 0.2,
     y: height / 2,
@@ -53,8 +40,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const pipeTimerRef = useRef(0);
   const groundOffsetRef = useRef(0);
   const wingAngleRef = useRef(0);
-  const canJumpRef = useRef(true);
   const lastJumpTimeRef = useRef(0);
+  const lastFrameTimeRef = useRef(0);
+
+  // Update config when difficulty changes
+  useEffect(() => {
+    configRef.current = DIFFICULTY_CONFIGS[gameState.difficulty];
+  }, [gameState.difficulty]);
 
   const resetGame = useCallback(() => {
     birdRef.current = {
@@ -67,7 +59,6 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     };
     pipesRef.current = [];
     pipeTimerRef.current = 0;
-    canJumpRef.current = true;
     lastJumpTimeRef.current = 0;
   }, [width, height]);
 
@@ -77,57 +68,57 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, resetGame]);
 
-  // Responsive jump function - immediate response
+  // Responsive jump - optimized for mobile
   const jump = useCallback(() => {
-    const now = Date.now();
+    const now = performance.now();
+    const config = configRef.current;
     
     if (gameState.status === 'idle') {
       onStart();
-      // First jump - immediate and strong
-      birdRef.current.velocity = CONFIG.jumpForce;
+      birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
-      wingAngleRef.current = 0; // Reset wing for flap effect
+      wingAngleRef.current = 0;
       return;
     }
     
     if (gameState.status === 'playing') {
-      // Minimum 50ms between jumps to prevent spam but keep responsive
-      if (now - lastJumpTimeRef.current < 50) return;
+      // 40ms minimum between jumps for mobile responsiveness
+      if (now - lastJumpTimeRef.current < 40) return;
       
-      // Immediate velocity set - no gradual changes
-      birdRef.current.velocity = CONFIG.jumpForce;
+      birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
-      wingAngleRef.current = 0; // Wing flap on jump
+      wingAngleRef.current = 0;
     }
   }, [gameState.status, onStart]);
 
   const spawnPipe = useCallback(() => {
+    const config = configRef.current;
     const minHeight = 70;
-    const maxHeight = height - CONFIG.groundHeight - CONFIG.pipeGap - minHeight - 30;
+    const maxHeight = height - config.groundHeight - config.pipeGap - minHeight - 30;
     const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
     
     pipesRef.current.push({
       x: width,
       topHeight,
-      bottomY: topHeight + CONFIG.pipeGap,
+      bottomY: topHeight + config.pipeGap,
       width: 70,
-      gap: CONFIG.pipeGap,
+      gap: config.pipeGap,
       passed: false,
     });
   }, [width, height]);
 
   const checkCollision = useCallback((bird: Bird, pipes: Pipe[]): boolean => {
-    // Ground collision
-    if (bird.y + bird.height / 2 >= height - CONFIG.groundHeight) {
+    const config = configRef.current;
+    
+    if (bird.y + bird.height / 2 >= height - config.groundHeight) {
       return true;
     }
-    // Ceiling - soft bounce instead of death
     if (bird.y - bird.height / 2 <= 0) {
       birdRef.current.y = bird.height / 2;
-      birdRef.current.velocity = 50; // Small bounce down
+      birdRef.current.velocity = 50;
       return false;
     }
-    // Pipe collision with fair hitbox
+    
     const hitboxPadding = 5;
     for (const pipe of pipes) {
       const birdLeft = bird.x - bird.width / 2 + hitboxPadding;
@@ -147,54 +138,43 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const updateGame = useCallback((deltaTime: number) => {
     if (gameState.status !== 'playing') return;
 
+    const config = configRef.current;
     const bird = birdRef.current;
     
-    // Smooth physics with deltaTime
-    // Apply gravity
-    bird.velocity += CONFIG.gravity * deltaTime;
+    // Clamp deltaTime for consistent physics on slow devices
+    const dt = Math.min(deltaTime, 0.033); // Cap at ~30fps equivalent
     
-    // Terminal velocity - cap falling speed for fairness
-    const maxFallSpeed = 700;
-    if (bird.velocity > maxFallSpeed) {
-      bird.velocity = maxFallSpeed;
+    // Physics
+    bird.velocity += config.gravity * dt;
+    if (bird.velocity > config.maxFallSpeed) {
+      bird.velocity = config.maxFallSpeed;
     }
+    bird.y += bird.velocity * dt;
     
-    // Update position
-    bird.y += bird.velocity * deltaTime;
-    
-    // Dynamic rotation based on velocity - more expressive
+    // Smooth rotation
     const targetRotation = bird.velocity > 0 
-      ? Math.min(bird.velocity / 8, 80)  // Diving down
-      : Math.max(bird.velocity / 6, -30); // Going up
-    
-    // Smooth rotation transition
-    bird.rotation += (targetRotation - bird.rotation) * 0.15;
+      ? Math.min(bird.velocity / 8, 80)
+      : Math.max(bird.velocity / 6, -30);
+    bird.rotation += (targetRotation - bird.rotation) * 0.12;
 
-    // Wing animation - faster when jumping
-    const timeSinceJump = Date.now() - lastJumpTimeRef.current;
-    if (timeSinceJump < 200) {
-      // Fast flap after jump
-      wingAngleRef.current += deltaTime * 40;
-    } else {
-      // Normal glide animation
-      wingAngleRef.current += deltaTime * 12;
-    }
+    // Wing animation
+    const timeSinceJump = performance.now() - lastJumpTimeRef.current;
+    wingAngleRef.current += dt * (timeSinceJump < 200 ? 40 : 12);
 
-    // Update ground offset for scrolling effect
-    groundOffsetRef.current = (groundOffsetRef.current + CONFIG.pipeSpeed * deltaTime) % 40;
+    // Ground scroll
+    groundOffsetRef.current = (groundOffsetRef.current + config.pipeSpeed * dt) % 40;
 
-    // Spawn pipes with initial delay
-    pipeTimerRef.current += deltaTime;
-    if (pipeTimerRef.current >= CONFIG.pipeSpawnInterval) {
+    // Spawn pipes
+    pipeTimerRef.current += dt;
+    if (pipeTimerRef.current >= config.pipeSpawnInterval) {
       spawnPipe();
       pipeTimerRef.current = 0;
     }
 
     // Update pipes
     pipesRef.current = pipesRef.current.filter(pipe => {
-      pipe.x -= CONFIG.pipeSpeed * deltaTime;
+      pipe.x -= config.pipeSpeed * dt;
       
-      // Score check
       if (!pipe.passed && pipe.x + pipe.width < bird.x) {
         pipe.passed = true;
         onScoreUpdate(gameState.score + 1);
@@ -205,7 +185,6 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       return pipe.x + pipe.width > -50;
     });
 
-    // Collision check
     if (checkCollision(bird, pipesRef.current)) {
       onGameOver(gameState.score);
     }
@@ -215,95 +194,82 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    // Sky gradient
+    const config = configRef.current;
+
+    // Sky
     const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
     skyGradient.addColorStop(0, COLORS.skyTop);
     skyGradient.addColorStop(1, COLORS.skyBottom);
     ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Animated clouds
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    const time = Date.now();
-    const cloudPositions = [
-      { x: (time / 50) % (width + 200) - 100, y: 60, size: 40 },
-      { x: ((time / 40) + 300) % (width + 200) - 100, y: 120, size: 50 },
-      { x: ((time / 60) + 500) % (width + 200) - 100, y: 80, size: 35 },
+    // Clouds (simplified for performance)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    const time = performance.now();
+    const clouds = [
+      { x: (time / 60) % (width + 150) - 75, y: 55, s: 35 },
+      { x: ((time / 50) + 250) % (width + 150) - 75, y: 100, s: 42 },
     ];
-    cloudPositions.forEach(cloud => {
+    clouds.forEach(c => {
       ctx.beginPath();
-      ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
-      ctx.arc(cloud.x + cloud.size * 0.8, cloud.y - cloud.size * 0.2, cloud.size * 0.7, 0, Math.PI * 2);
-      ctx.arc(cloud.x + cloud.size * 1.4, cloud.y, cloud.size * 0.6, 0, Math.PI * 2);
+      ctx.arc(c.x, c.y, c.s, 0, Math.PI * 2);
+      ctx.arc(c.x + c.s * 0.7, c.y - c.s * 0.2, c.s * 0.6, 0, Math.PI * 2);
+      ctx.arc(c.x + c.s * 1.2, c.y, c.s * 0.5, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Draw pipes
+    // Pipes
     pipesRef.current.forEach(pipe => {
-      const pipeGradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipe.width, 0);
-      pipeGradient.addColorStop(0, COLORS.pipeShadow);
-      pipeGradient.addColorStop(0.2, COLORS.pipeMain);
-      pipeGradient.addColorStop(0.5, COLORS.pipeHighlight);
-      pipeGradient.addColorStop(0.8, COLORS.pipeMain);
-      pipeGradient.addColorStop(1, COLORS.pipeShadow);
+      const pg = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipe.width, 0);
+      pg.addColorStop(0, COLORS.pipeShadow);
+      pg.addColorStop(0.3, COLORS.pipeMain);
+      pg.addColorStop(0.6, COLORS.pipeHighlight);
+      pg.addColorStop(1, COLORS.pipeShadow);
       
-      // Top pipe
-      ctx.fillStyle = pipeGradient;
+      ctx.fillStyle = pg;
       ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
-      ctx.fillRect(pipe.x - 5, pipe.topHeight - 30, pipe.width + 10, 30);
+      ctx.fillRect(pipe.x - 5, pipe.topHeight - 28, pipe.width + 10, 28);
+      ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, height - pipe.bottomY - config.groundHeight);
+      ctx.fillRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 28);
+      
       ctx.strokeStyle = COLORS.pipeBorder;
       ctx.lineWidth = 2;
-      ctx.strokeRect(pipe.x - 5, pipe.topHeight - 30, pipe.width + 10, 30);
-      ctx.strokeRect(pipe.x, 0, pipe.width, pipe.topHeight - 30);
-
-      // Bottom pipe
-      ctx.fillStyle = pipeGradient;
-      ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, height - pipe.bottomY - CONFIG.groundHeight);
-      ctx.fillRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 30);
-      ctx.strokeRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 30);
-      ctx.strokeRect(pipe.x, pipe.bottomY + 30, pipe.width, height - pipe.bottomY - CONFIG.groundHeight - 30);
+      ctx.strokeRect(pipe.x - 5, pipe.topHeight - 28, pipe.width + 10, 28);
+      ctx.strokeRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 28);
     });
 
     // Ground
-    const groundY = height - CONFIG.groundHeight;
+    const groundY = height - config.groundHeight;
     ctx.fillStyle = COLORS.groundTop;
-    ctx.fillRect(0, groundY, width, 20);
+    ctx.fillRect(0, groundY, width, 18);
     ctx.fillStyle = COLORS.ground;
-    ctx.fillRect(0, groundY + 20, width, CONFIG.groundHeight - 20);
+    ctx.fillRect(0, groundY + 18, width, config.groundHeight - 18);
     
     ctx.fillStyle = COLORS.groundPattern;
     for (let i = -groundOffsetRef.current; i < width + 40; i += 40) {
       ctx.beginPath();
       ctx.moveTo(i, groundY);
-      ctx.lineTo(i + 20, groundY + 20);
-      ctx.lineTo(i, groundY + 20);
+      ctx.lineTo(i + 18, groundY + 18);
+      ctx.lineTo(i, groundY + 18);
       ctx.fill();
     }
 
-    // Bird shadow
+    // Bird
     const bird = birdRef.current;
-    ctx.save();
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.ellipse(bird.x + 3, height - CONFIG.groundHeight - 8, bird.width / 3, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
     
-    // Draw bird
     ctx.save();
     ctx.translate(bird.x, bird.y);
     ctx.rotate((bird.rotation * Math.PI) / 180);
 
-    // Body with gradient
-    const bodyGradient = ctx.createRadialGradient(-3, -5, 2, 0, 0, bird.width / 2);
-    bodyGradient.addColorStop(0, '#FFF176');
-    bodyGradient.addColorStop(0.5, '#FFD700');
-    bodyGradient.addColorStop(1, '#FFA000');
-    ctx.fillStyle = bodyGradient;
+    // Body
+    const bg = ctx.createRadialGradient(-3, -5, 2, 0, 0, bird.width / 2);
+    bg.addColorStop(0, '#FFF176');
+    bg.addColorStop(0.5, '#FFD700');
+    bg.addColorStop(1, '#FFA000');
+    ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -311,35 +277,28 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Wing with flap animation
-    const wingY = Math.sin(wingAngleRef.current) * 7;
-    const wingScale = 1 + Math.sin(wingAngleRef.current) * 0.15;
-    ctx.fillStyle = COLORS.birdWing;
+    // Wing
+    const wy = Math.sin(wingAngleRef.current) * 7;
+    ctx.fillStyle = '#FFA500';
     ctx.beginPath();
-    ctx.ellipse(-5, wingY, 13 * wingScale, 9, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-5, wy, 13, 9, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#BF360C';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Eye white
-    ctx.fillStyle = '#FFFFFF';
+    // Eye
+    ctx.fillStyle = '#FFF';
     ctx.beginPath();
     ctx.arc(bird.width / 4 + 2, -bird.height / 6, 9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#E0E0E0';
-    ctx.lineWidth = 1;
-    ctx.stroke();
     
-    // Pupil - follows velocity direction
-    const pupilOffsetX = Math.min(Math.max(bird.velocity / 300, -2), 2);
-    const pupilOffsetY = Math.min(bird.velocity / 250, 3);
+    const py = Math.min(bird.velocity / 250, 3);
     ctx.fillStyle = '#212121';
     ctx.beginPath();
-    ctx.arc(bird.width / 4 + 3 + pupilOffsetX, -bird.height / 6 + pupilOffsetY, 4.5, 0, Math.PI * 2);
+    ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 4.5, 0, Math.PI * 2);
     ctx.fill();
     
-    // Eye highlight
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
     ctx.arc(bird.width / 4 + 5, -bird.height / 6 - 3, 2.5, 0, Math.PI * 2);
@@ -353,31 +312,23 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.lineTo(bird.width / 2 - 3, 10);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#BF360C';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Belly highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(-2, 5, bird.width / 3, bird.height / 4, 0, 0, Math.PI * 2);
-    ctx.fill();
 
     ctx.restore();
 
-    // Score flash effect
+    // Score flash
     if (scoreFlash) {
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.25)';
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
       ctx.fillRect(0, 0, width, height);
     }
   }, [width, height, scoreFlash]);
 
+  // Game loop with RAF optimization
   useGameLoop((deltaTime) => {
     updateGame(deltaTime);
     drawGame();
   }, gameState.status === 'playing');
 
-  // Idle animation - smooth floating
+  // Idle animation
   useEffect(() => {
     if (gameState.status === 'idle') {
       let animationId: number;
@@ -400,14 +351,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, height, drawGame]);
 
-  // Game over state
   useEffect(() => {
     if (gameState.status === 'gameOver') {
       drawGame();
     }
   }, [gameState.status, drawGame]);
 
-  // Keyboard controls
+  // Keyboard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
@@ -419,9 +369,10 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch and click handling with immediate response
+  // Optimized touch handling for mobile
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     jump();
   }, [jump]);
 
@@ -430,10 +381,11 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ref={canvasRef}
       width={width}
       height={height}
-      className="game-canvas cursor-pointer"
+      className="game-canvas cursor-pointer touch-none"
       onClick={handleInteraction}
       onTouchStart={handleInteraction}
       onTouchEnd={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
     />
   );
 };
