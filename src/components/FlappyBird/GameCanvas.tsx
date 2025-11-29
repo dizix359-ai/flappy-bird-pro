@@ -41,7 +41,6 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const groundOffsetRef = useRef(0);
   const wingAngleRef = useRef(0);
   const lastJumpTimeRef = useRef(0);
-  const lastFrameTimeRef = useRef(0);
 
   // Update config when difficulty changes
   useEffect(() => {
@@ -68,7 +67,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, resetGame]);
 
-  // Responsive jump - optimized for mobile
+  // Responsive jump
   const jump = useCallback(() => {
     const now = performance.now();
     const config = configRef.current;
@@ -82,9 +81,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
     
     if (gameState.status === 'playing') {
-      // 40ms minimum between jumps for mobile responsiveness
       if (now - lastJumpTimeRef.current < 40) return;
-      
       birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
       wingAngleRef.current = 0;
@@ -141,37 +138,30 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     const config = configRef.current;
     const bird = birdRef.current;
     
-    // Clamp deltaTime for consistent physics on slow devices
-    const dt = Math.min(deltaTime, 0.033); // Cap at ~30fps equivalent
+    const dt = Math.min(deltaTime, 0.033);
     
-    // Physics
     bird.velocity += config.gravity * dt;
     if (bird.velocity > config.maxFallSpeed) {
       bird.velocity = config.maxFallSpeed;
     }
     bird.y += bird.velocity * dt;
     
-    // Smooth rotation
     const targetRotation = bird.velocity > 0 
       ? Math.min(bird.velocity / 8, 80)
       : Math.max(bird.velocity / 6, -30);
     bird.rotation += (targetRotation - bird.rotation) * 0.12;
 
-    // Wing animation
     const timeSinceJump = performance.now() - lastJumpTimeRef.current;
     wingAngleRef.current += dt * (timeSinceJump < 200 ? 40 : 12);
 
-    // Ground scroll
     groundOffsetRef.current = (groundOffsetRef.current + config.pipeSpeed * dt) % 40;
 
-    // Spawn pipes
     pipeTimerRef.current += dt;
     if (pipeTimerRef.current >= config.pipeSpawnInterval) {
       spawnPipe();
       pipeTimerRef.current = 0;
     }
 
-    // Update pipes
     pipesRef.current = pipesRef.current.filter(pipe => {
       pipe.x -= config.pipeSpeed * dt;
       
@@ -206,7 +196,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Clouds (simplified for performance)
+    // Clouds
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     const time = performance.now();
     const clouds = [
@@ -322,7 +312,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [width, height, scoreFlash]);
 
-  // Game loop with RAF optimization
+  // Game loop
   useGameLoop((deltaTime) => {
     updateGame(deltaTime);
     drawGame();
@@ -351,6 +341,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, height, drawGame]);
 
+  // Game over - draw once
   useEffect(() => {
     if (gameState.status === 'gameOver') {
       drawGame();
@@ -369,7 +360,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Optimized touch handling for mobile
+  // Touch handling
   const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -381,7 +372,8 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ref={canvasRef}
       width={width}
       height={height}
-      className="game-canvas cursor-pointer touch-none"
+      className="block cursor-pointer touch-none"
+      style={{ width, height }}
       onClick={handleInteraction}
       onTouchStart={handleInteraction}
       onTouchEnd={(e) => e.preventDefault()}

@@ -14,11 +14,11 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
   if (gameState.status === 'playing') {
     return (
       <div 
-        className="absolute top-4 left-0 right-0 flex flex-col items-center pointer-events-none"
+        className="absolute top-4 left-0 right-0 flex flex-col items-center pointer-events-none z-10"
         style={{ width: canvasWidth }}
       >
         <span className="score-display">{gameState.score}</span>
-        <span className="text-xs text-card/70 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+        <span className="text-xs text-white/80 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
           {difficultyLabel}
         </span>
       </div>
@@ -28,17 +28,17 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
   if (gameState.status === 'idle') {
     return (
       <div 
-        className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4"
+        className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4 z-10"
         style={{ width: canvasWidth, height: canvasHeight }}
       >
-        <div className="bg-foreground/30 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
-          <p className="text-lg md:text-xl text-card font-bold mb-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+        <div className="bg-black/30 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
+          <p className="text-lg md:text-xl text-white font-bold mb-2" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
             {difficultyLabel}
           </p>
-          <p className="text-sm text-card/90" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+          <p className="text-base text-white/90" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
             اضغط للبدء!
           </p>
-          <p className="text-xs text-card/70 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
+          <p className="text-xs text-white/70 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}>
             Tap to Start
           </p>
         </div>
@@ -48,7 +48,7 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
             e.stopPropagation();
             onBackToMenu();
           }}
-          className="text-xs text-card/60 underline hover:text-card/90 transition-colors pointer-events-auto"
+          className="text-sm text-white/70 underline hover:text-white transition-colors pointer-events-auto bg-black/20 px-4 py-2 rounded-lg"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
           ← تغيير المستوى
@@ -62,41 +62,46 @@ export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvas
     
     return (
       <div 
-        className="game-overlay rounded-2xl"
-        style={{ width: canvasWidth, height: canvasHeight }}
+        className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4 z-10"
+        style={{ 
+          width: canvasWidth, 
+          height: canvasHeight,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)'
+        }}
       >
-        <h2 className="text-xl md:text-3xl font-bold text-primary" style={{ textShadow: '2px 2px 0 rgba(0,0,0,0.3)' }}>
+        <h2 className="text-xl md:text-3xl font-bold text-yellow-400" style={{ textShadow: '2px 2px 0 rgba(0,0,0,0.4)' }}>
           انتهت اللعبة!
         </h2>
         
-        <p className="text-sm text-card/80">{difficultyLabel}</p>
+        <p className="text-sm text-white/80">{difficultyLabel}</p>
         
         {isNewHighScore && (
-          <div className="bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg animate-bounce">
+          <div className="bg-yellow-500 text-yellow-900 px-4 py-2 rounded-lg animate-bounce">
             <p className="text-sm font-bold">🎉 رقم قياسي جديد!</p>
           </div>
         )}
         
-        <div className="text-center bg-card/20 backdrop-blur-sm rounded-xl px-6 py-4">
-          <p className="text-sm text-card/80 mb-1">النتيجة</p>
-          <p className="text-3xl text-primary font-bold">{gameState.score}</p>
-          <div className="border-t border-card/30 mt-3 pt-3">
-            <p className="text-xs text-card/70">أفضل نتيجة</p>
-            <p className="text-lg text-accent font-bold">{gameState.highScore}</p>
+        <div className="text-center bg-white/20 backdrop-blur-sm rounded-xl px-8 py-5">
+          <p className="text-sm text-white/80 mb-1">النتيجة</p>
+          <p className="text-4xl text-yellow-400 font-bold">{gameState.score}</p>
+          <div className="border-t border-white/30 mt-4 pt-4">
+            <p className="text-xs text-white/70">أفضل نتيجة</p>
+            <p className="text-xl text-orange-400 font-bold">{gameState.highScore}</p>
           </div>
         </div>
         
-        <div className="flex flex-col gap-3 w-full max-w-[200px]">
+        <div className="flex flex-col gap-3 w-full max-w-[220px]">
           <button
             onClick={onRestart}
-            className="game-button text-sm"
+            className="game-button text-sm py-3"
           >
             🔄 العب مرة أخرى
           </button>
           
           <button
             onClick={onBackToMenu}
-            className="text-sm text-card/70 underline hover:text-card transition-colors"
+            className="text-sm text-white/70 underline hover:text-white transition-colors bg-black/20 px-4 py-2 rounded-lg"
           >
             ← القائمة الرئيسية
           </button>
