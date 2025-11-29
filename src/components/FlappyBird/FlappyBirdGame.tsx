@@ -17,14 +17,12 @@ export const FlappyBirdGame = () => {
     difficulty: 'easy',
   });
 
-  // Load high scores
   useEffect(() => {
     const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
     const hardScore = parseInt(localStorage.getItem(STORAGE_KEY_HARD) || '0', 10);
     setHighScores({ easy: easyScore, hard: hardScore });
   }, []);
 
-  // Responsive dimensions optimized for mobile
   useEffect(() => {
     const updateDimensions = () => {
       const maxWidth = Math.min(window.innerWidth - 8, 420);
@@ -123,7 +121,6 @@ export const FlappyBirdGame = () => {
         }}
       >
         {gameState.status === 'menu' ? (
-          // Menu with background
           <div 
             className="absolute inset-0"
             style={{ background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)' }}
@@ -134,7 +131,6 @@ export const FlappyBirdGame = () => {
             />
           </div>
         ) : (
-          // Game canvas and UI
           <>
             <GameCanvas
               width={dimensions.width}

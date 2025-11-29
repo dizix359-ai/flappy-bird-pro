@@ -25,6 +25,7 @@ interface GameCanvasProps {
 
 export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [scoreFlash, setScoreFlash] = useState(false);
   const configRef = useRef<GameConfig>(DIFFICULTY_CONFIGS[gameState.difficulty]);
   
@@ -42,7 +43,6 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const wingAngleRef = useRef(0);
   const lastJumpTimeRef = useRef(0);
 
-  // Update config when difficulty changes
   useEffect(() => {
     configRef.current = DIFFICULTY_CONFIGS[gameState.difficulty];
   }, [gameState.difficulty]);
@@ -67,7 +67,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, resetGame]);
 
-  // Responsive jump
+  // Jump function - core gameplay
   const jump = useCallback(() => {
     const now = performance.now();
     const config = configRef.current;
@@ -81,7 +81,8 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
     
     if (gameState.status === 'playing') {
-      if (now - lastJumpTimeRef.current < 40) return;
+      // Minimum 35ms between jumps for responsive feel
+      if (now - lastJumpTimeRef.current < 35) return;
       birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
       wingAngleRef.current = 0;
@@ -341,14 +342,14 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     }
   }, [gameState.status, height, drawGame]);
 
-  // Game over - draw once
+  // Game over
   useEffect(() => {
     if (gameState.status === 'gameOver') {
       drawGame();
     }
   }, [gameState.status, drawGame]);
 
-  // Keyboard
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
@@ -360,24 +361,51 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [jump]);
 
-  // Touch handling
-  const handleInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    jump();
+  // Touch and pointer events - optimized for mobile
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      jump();
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      e.preventDefault();
+      jump();
+    };
+
+    // Use passive: false for immediate response
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('pointerdown', handlePointerDown);
+    };
   }, [jump]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className="block cursor-pointer touch-none"
-      style={{ width, height }}
-      onClick={handleInteraction}
-      onTouchStart={handleInteraction}
-      onTouchEnd={(e) => e.preventDefault()}
-      onContextMenu={(e) => e.preventDefault()}
-    />
+    <div 
+      ref={containerRef}
+      className="relative cursor-pointer select-none"
+      style={{ 
+        width, 
+        height,
+        touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className="block"
+        style={{ width, height }}
+      />
+    </div>
   );
 };
