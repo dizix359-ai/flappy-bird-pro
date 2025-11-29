@@ -1,30 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GameCanvas } from './GameCanvas';
 import { GameUI } from './GameUI';
-import { GameState } from './types';
+import { DifficultyMenu } from './DifficultyMenu';
+import { GameState, Difficulty } from './types';
 
-const STORAGE_KEY = 'flappy-bird-high-score';
+const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
+const STORAGE_KEY_HARD = 'flappy-bird-high-score-hard';
 
 export const FlappyBirdGame = () => {
   const [dimensions, setDimensions] = useState({ width: 400, height: 600 });
+  const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0 });
   const [gameState, setGameState] = useState<GameState>({
-    status: 'idle',
+    status: 'menu',
     score: 0,
     highScore: 0,
+    difficulty: 'easy',
   });
 
+  // Load high scores
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setGameState(prev => ({ ...prev, highScore: parseInt(saved, 10) }));
-    }
+    const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
+    const hardScore = parseInt(localStorage.getItem(STORAGE_KEY_HARD) || '0', 10);
+    setHighScores({ easy: easyScore, hard: hardScore });
   }, []);
 
+  // Responsive dimensions optimized for mobile
   useEffect(() => {
     const updateDimensions = () => {
-      const maxWidth = Math.min(window.innerWidth - 16, 450);
-      const maxHeight = Math.min(window.innerHeight - 32, 700);
-      const aspectRatio = 0.67;
+      const maxWidth = Math.min(window.innerWidth - 8, 420);
+      const maxHeight = Math.min(window.innerHeight - 16, 680);
+      const aspectRatio = 0.62;
       
       let width = maxWidth;
       let height = width / aspectRatio;
@@ -34,13 +39,30 @@ export const FlappyBirdGame = () => {
         width = height * aspectRatio;
       }
       
-      setDimensions({ width: Math.floor(width), height: Math.floor(height) });
+      setDimensions({ 
+        width: Math.floor(width), 
+        height: Math.floor(height) 
+      });
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    window.addEventListener('orientationchange', updateDimensions);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      window.removeEventListener('orientationchange', updateDimensions);
+    };
   }, []);
+
+  const handleSelectDifficulty = useCallback((difficulty: Difficulty) => {
+    setGameState({
+      status: 'idle',
+      score: 0,
+      highScore: highScores[difficulty],
+      difficulty,
+    });
+  }, [highScores]);
 
   const handleStart = useCallback(() => {
     setGameState(prev => ({
@@ -56,10 +78,15 @@ export const FlappyBirdGame = () => {
 
   const handleGameOver = useCallback((finalScore: number) => {
     setGameState(prev => {
-      const newHighScore = Math.max(prev.highScore, finalScore);
-      if (newHighScore > prev.highScore) {
-        localStorage.setItem(STORAGE_KEY, newHighScore.toString());
+      const storageKey = prev.difficulty === 'easy' ? STORAGE_KEY_EASY : STORAGE_KEY_HARD;
+      const currentHigh = highScores[prev.difficulty];
+      const newHighScore = Math.max(currentHigh, finalScore);
+      
+      if (newHighScore > currentHigh) {
+        localStorage.setItem(storageKey, newHighScore.toString());
+        setHighScores(h => ({ ...h, [prev.difficulty]: newHighScore }));
       }
+      
       return {
         ...prev,
         status: 'gameOver',
@@ -67,7 +94,7 @@ export const FlappyBirdGame = () => {
         highScore: newHighScore,
       };
     });
-  }, []);
+  }, [highScores]);
 
   const handleRestart = useCallback(() => {
     setGameState(prev => ({
@@ -77,23 +104,50 @@ export const FlappyBirdGame = () => {
     }));
   }, []);
 
+  const handleBackToMenu = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      status: 'menu',
+      score: 0,
+    }));
+  }, []);
+
   return (
     <div className="game-container">
-      <div className="relative">
-        <GameCanvas
-          width={dimensions.width}
-          height={dimensions.height}
-          gameState={gameState}
-          onStart={handleStart}
-          onScoreUpdate={handleScoreUpdate}
-          onGameOver={handleGameOver}
+      <div className="relative" style={{ width: dimensions.width, height: dimensions.height }}>
+        {/* Background canvas always visible */}
+        <div 
+          className="absolute inset-0 rounded-2xl overflow-hidden"
+          style={{ 
+            background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+          }}
         />
-        <GameUI
-          gameState={gameState}
-          onRestart={handleRestart}
-          canvasWidth={dimensions.width}
-          canvasHeight={dimensions.height}
-        />
+        
+        {gameState.status === 'menu' ? (
+          <DifficultyMenu 
+            onSelect={handleSelectDifficulty} 
+            highScores={highScores}
+          />
+        ) : (
+          <>
+            <GameCanvas
+              width={dimensions.width}
+              height={dimensions.height}
+              gameState={gameState}
+              onStart={handleStart}
+              onScoreUpdate={handleScoreUpdate}
+              onGameOver={handleGameOver}
+            />
+            <GameUI
+              gameState={gameState}
+              onRestart={handleRestart}
+              onBackToMenu={handleBackToMenu}
+              canvasWidth={dimensions.width}
+              canvasHeight={dimensions.height}
+            />
+          </>
+        )}
       </div>
     </div>
   );
