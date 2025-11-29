@@ -1,4 +1,5 @@
 import { Difficulty } from './types';
+import { AboutDialog } from './AboutDialog';
 
 interface DifficultyMenuProps {
   onSelect: (difficulty: Difficulty) => void;
@@ -7,7 +8,8 @@ interface DifficultyMenuProps {
 
 export const DifficultyMenu = ({ onSelect, highScores }: DifficultyMenuProps) => {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-5 px-6">
+    <div className="w-full h-full flex flex-col items-center justify-center gap-5 px-6 relative">
+      <AboutDialog />
       <h1 className="game-title text-2xl md:text-4xl mb-2">Flappy Bird</h1>
       
       <div className="floating my-3">
