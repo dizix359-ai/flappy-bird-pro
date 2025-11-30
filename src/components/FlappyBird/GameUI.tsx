@@ -9,7 +9,12 @@ interface GameUIProps {
 }
 
 export const GameUI = ({ gameState, onRestart, onBackToMenu, canvasWidth, canvasHeight }: GameUIProps) => {
-  const difficultyLabel = gameState.difficulty === 'easy' ? '🌱 سهل' : '🔥 صعب';
+  const difficultyLabels = {
+    easy: '🌱 سهل',
+    hard: '🔥 صعب',
+    crazy: '💀 مجنون',
+  };
+  const difficultyLabel = difficultyLabels[gameState.difficulty];
 
   if (gameState.status === 'playing') {
     return (
