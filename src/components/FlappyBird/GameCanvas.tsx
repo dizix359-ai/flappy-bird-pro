@@ -21,9 +21,11 @@ interface GameCanvasProps {
   onScoreUpdate: (score: number) => void;
   gameState: GameState;
   onStart: () => void;
+  onJump?: () => void;
+  onScore?: () => void;
 }
 
-export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart }: GameCanvasProps) => {
+export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart, onJump, onScore }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scoreFlash, setScoreFlash] = useState(false);
@@ -77,6 +79,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
       wingAngleRef.current = 0;
+      onJump?.();
       return;
     }
     
@@ -86,8 +89,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       birdRef.current.velocity = config.jumpForce;
       lastJumpTimeRef.current = now;
       wingAngleRef.current = 0;
+      onJump?.();
     }
-  }, [gameState.status, onStart]);
+  }, [gameState.status, onStart, onJump]);
 
   const spawnPipe = useCallback(() => {
     const config = configRef.current;
@@ -169,6 +173,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       if (!pipe.passed && pipe.x + pipe.width < bird.x) {
         pipe.passed = true;
         onScoreUpdate(gameState.score + 1);
+        onScore?.();
         setScoreFlash(true);
         setTimeout(() => setScoreFlash(false), 100);
       }
@@ -179,7 +184,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     if (checkCollision(bird, pipesRef.current)) {
       onGameOver(gameState.score);
     }
-  }, [gameState.status, gameState.score, spawnPipe, checkCollision, onScoreUpdate, onGameOver]);
+  }, [gameState.status, gameState.score, spawnPipe, checkCollision, onScoreUpdate, onGameOver, onScore]);
 
   const drawGame = useCallback(() => {
     const canvas = canvasRef.current;
