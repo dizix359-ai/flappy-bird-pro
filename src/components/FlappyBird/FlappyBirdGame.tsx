@@ -3,6 +3,7 @@ import { GameCanvas } from './GameCanvas';
 import { GameUI } from './GameUI';
 import { DifficultyMenu } from './DifficultyMenu';
 import { GameState, Difficulty } from './types';
+import { useGameAudio } from '@/hooks/useGameAudio';
 
 const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
 const STORAGE_KEY_HARD = 'flappy-bird-high-score-hard';
@@ -16,6 +17,8 @@ export const FlappyBirdGame = () => {
     highScore: 0,
     difficulty: 'easy',
   });
+
+  const audio = useGameAudio();
 
   useEffect(() => {
     const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
@@ -68,13 +71,16 @@ export const FlappyBirdGame = () => {
       status: 'playing',
       score: 0,
     }));
-  }, []);
+    audio.startMusic();
+  }, [audio]);
 
   const handleScoreUpdate = useCallback((score: number) => {
     setGameState(prev => ({ ...prev, score }));
   }, []);
 
   const handleGameOver = useCallback((finalScore: number) => {
+    audio.stopMusic();
+    audio.playGameOver();
     setGameState(prev => {
       const storageKey = prev.difficulty === 'easy' ? STORAGE_KEY_EASY : STORAGE_KEY_HARD;
       const currentHigh = highScores[prev.difficulty];
@@ -92,7 +98,7 @@ export const FlappyBirdGame = () => {
         highScore: newHighScore,
       };
     });
-  }, [highScores]);
+  }, [highScores, audio]);
 
   const handleRestart = useCallback(() => {
     setGameState(prev => ({
@@ -103,12 +109,13 @@ export const FlappyBirdGame = () => {
   }, []);
 
   const handleBackToMenu = useCallback(() => {
+    audio.stopMusic();
     setGameState(prev => ({
       ...prev,
       status: 'menu',
       score: 0,
     }));
-  }, []);
+  }, [audio]);
 
   return (
     <div className="game-container">
@@ -123,11 +130,15 @@ export const FlappyBirdGame = () => {
         {gameState.status === 'menu' ? (
           <div 
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)' }}
+            style={{ background: 'var(--gradient-sky)' }}
           >
             <DifficultyMenu 
               onSelect={handleSelectDifficulty} 
               highScores={highScores}
+              audioSettings={audio.settings}
+              onToggleSound={audio.toggleSound}
+              onToggleMusic={audio.toggleMusic}
+              onUpdateAudioSettings={audio.updateSettings}
             />
           </div>
         ) : (
@@ -139,6 +150,8 @@ export const FlappyBirdGame = () => {
               onStart={handleStart}
               onScoreUpdate={handleScoreUpdate}
               onGameOver={handleGameOver}
+              onJump={audio.playJump}
+              onScore={audio.playScore}
             />
             <GameUI
               gameState={gameState}

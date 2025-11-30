@@ -1,17 +1,44 @@
 import { Difficulty } from './types';
 import { AboutDialog } from './AboutDialog';
 import { ThemeToggle } from './ThemeToggle';
+import { SettingsDialog } from './SettingsDialog';
+
+interface AudioSettings {
+  soundEnabled: boolean;
+  musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
+}
 
 interface DifficultyMenuProps {
   onSelect: (difficulty: Difficulty) => void;
   highScores: Record<Difficulty, number>;
+  audioSettings: AudioSettings;
+  onToggleSound: () => void;
+  onToggleMusic: () => void;
+  onUpdateAudioSettings: (settings: Partial<AudioSettings>) => void;
 }
 
-export const DifficultyMenu = ({ onSelect, highScores }: DifficultyMenuProps) => {
+export const DifficultyMenu = ({ 
+  onSelect, 
+  highScores,
+  audioSettings,
+  onToggleSound,
+  onToggleMusic,
+  onUpdateAudioSettings,
+}: DifficultyMenuProps) => {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-5 px-6 relative">
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-        <AboutDialog />
+        <div className="flex gap-2">
+          <AboutDialog />
+          <SettingsDialog
+            settings={audioSettings}
+            onToggleSound={onToggleSound}
+            onToggleMusic={onToggleMusic}
+            onUpdateSettings={onUpdateAudioSettings}
+          />
+        </div>
         <ThemeToggle />
       </div>
       <h1 className="game-title text-2xl md:text-4xl mb-2">Flappy Bird</h1>
