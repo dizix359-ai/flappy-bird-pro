@@ -72,6 +72,11 @@
     --border: 220 20% 25%;
     --input: 220 20% 25%;
     --ring: 45 100% 55%;
+
+    /* Dark mode game colors */
+    --sky-top: 220 40% 18%;
+    --sky-bottom: 240 30% 25%;
+    --gradient-sky: linear-gradient(180deg, hsl(var(--sky-top)) 0%, hsl(var(--sky-bottom)) 100%);
   }
 }
 
