@@ -7,10 +7,19 @@ import { useGameAudio } from '@/hooks/useGameAudio';
 
 const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
 const STORAGE_KEY_HARD = 'flappy-bird-high-score-hard';
+const STORAGE_KEY_CRAZY = 'flappy-bird-high-score-crazy';
+
+const getStorageKey = (difficulty: Difficulty) => {
+  switch (difficulty) {
+    case 'easy': return STORAGE_KEY_EASY;
+    case 'hard': return STORAGE_KEY_HARD;
+    case 'crazy': return STORAGE_KEY_CRAZY;
+  }
+};
 
 export const FlappyBirdGame = () => {
   const [dimensions, setDimensions] = useState({ width: 400, height: 600 });
-  const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0 });
+  const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0, crazy: 0 });
   const [gameState, setGameState] = useState<GameState>({
     status: 'menu',
     score: 0,
@@ -23,7 +32,8 @@ export const FlappyBirdGame = () => {
   useEffect(() => {
     const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
     const hardScore = parseInt(localStorage.getItem(STORAGE_KEY_HARD) || '0', 10);
-    setHighScores({ easy: easyScore, hard: hardScore });
+    const crazyScore = parseInt(localStorage.getItem(STORAGE_KEY_CRAZY) || '0', 10);
+    setHighScores({ easy: easyScore, hard: hardScore, crazy: crazyScore });
   }, []);
 
   useEffect(() => {
@@ -82,7 +92,7 @@ export const FlappyBirdGame = () => {
     audio.stopMusic();
     audio.playGameOver();
     setGameState(prev => {
-      const storageKey = prev.difficulty === 'easy' ? STORAGE_KEY_EASY : STORAGE_KEY_HARD;
+      const storageKey = getStorageKey(prev.difficulty);
       const currentHigh = highScores[prev.difficulty];
       const newHighScore = Math.max(currentHigh, finalScore);
       

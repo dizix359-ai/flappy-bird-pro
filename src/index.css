@@ -162,6 +162,27 @@
     transform: scale(1.02);
   }
 
+  .difficulty-button.crazy-mode {
+    background: linear-gradient(135deg, hsl(280 80% 45%) 0%, hsl(320 80% 50%) 50%, hsl(350 80% 55%) 100%);
+    color: white;
+    box-shadow: 0 4px 16px hsl(280 80% 45% / 0.5);
+    animation: crazy-pulse 2s ease-in-out infinite;
+  }
+
+  .difficulty-button.crazy-mode:hover {
+    box-shadow: 0 6px 24px hsl(320 80% 50% / 0.6);
+    transform: scale(1.02);
+  }
+
+  @keyframes crazy-pulse {
+    0%, 100% { 
+      box-shadow: 0 4px 16px hsl(280 80% 45% / 0.5);
+    }
+    50% { 
+      box-shadow: 0 4px 24px hsl(320 80% 50% / 0.7), 0 0 20px hsl(350 80% 55% / 0.4);
+    }
+  }
+
   .score-display {
     @apply text-4xl font-bold;
     color: hsl(var(--card));

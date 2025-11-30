@@ -58,7 +58,7 @@ export const DifficultyMenu = ({
         اختر مستوى الصعوبة
       </p>
 
-      <div className="flex flex-col gap-4 w-full max-w-[280px]">
+      <div className="flex flex-col gap-3 w-full max-w-[280px]">
         {/* Easy Mode */}
         <button
           onClick={() => onSelect('easy')}
@@ -102,9 +102,31 @@ export const DifficultyMenu = ({
             )}
           </div>
         </button>
+
+        {/* Crazy Mode */}
+        <button
+          onClick={() => onSelect('crazy')}
+          className="difficulty-button crazy-mode"
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">💀</span>
+              <div className="text-right">
+                <p className="font-bold text-base md:text-lg">مجنون</p>
+                <p className="text-xs opacity-80">Crazy Mode</p>
+              </div>
+            </div>
+            {highScores.crazy > 0 && (
+              <div className="text-left bg-white/20 rounded-lg px-3 py-1">
+                <p className="text-xs opacity-80">أفضل</p>
+                <p className="font-bold text-sm">{highScores.crazy}</p>
+              </div>
+            )}
+          </div>
+        </button>
       </div>
 
-      <p className="text-xs text-white/70 mt-3 text-center" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.4)' }}>
+      <p className="text-xs text-white/70 mt-2 text-center" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.4)' }}>
         تجنب الأنابيب واجمع أكبر عدد من النقاط!
       </p>
     </div>
