@@ -12,23 +12,22 @@ export const AboutDialog = () => {
     <Dialog>
       <DialogTrigger asChild>
         <button
-          className="absolute top-3 left-3 w-9 h-9 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center hover:bg-white/50 transition-colors z-10"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+          className="w-9 h-9 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center hover:bg-card transition-colors border border-border/50"
         >
-          <Info className="w-5 h-5 text-white drop-shadow" />
+          <Info className="w-5 h-5 text-foreground" />
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto bg-gradient-to-b from-sky-100 to-sky-200 border-sky-300">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-center text-xl text-sky-800">
+          <DialogTitle className="text-center text-xl text-foreground">
             حول المشروع
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4 text-sm text-sky-900 leading-relaxed" dir="rtl">
+        <div className="space-y-4 text-sm text-foreground leading-relaxed" dir="rtl">
           {/* Student Info */}
-          <section className="bg-white/50 rounded-lg p-3">
-            <h3 className="font-bold text-sky-700 mb-2 flex items-center gap-2">
+          <section className="bg-muted/50 rounded-lg p-3">
+            <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
               <span>👨‍🎓</span> معلومات الطالب
             </h3>
             <p><strong>الاسم:</strong> ساكر رائد</p>
@@ -37,8 +36,8 @@ export const AboutDialog = () => {
           </section>
 
           {/* Technologies Used */}
-          <section className="bg-white/50 rounded-lg p-3">
-            <h3 className="font-bold text-sky-700 mb-2 flex items-center gap-2">
+          <section className="bg-muted/50 rounded-lg p-3">
+            <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
               <span>💻</span> التقنيات المستخدمة
             </h3>
             <ul className="list-disc list-inside space-y-1 mr-2">
@@ -51,8 +50,8 @@ export const AboutDialog = () => {
           </section>
 
           {/* Development Steps */}
-          <section className="bg-white/50 rounded-lg p-3">
-            <h3 className="font-bold text-sky-700 mb-2 flex items-center gap-2">
+          <section className="bg-muted/50 rounded-lg p-3">
+            <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
               <span>📝</span> خطوات التطوير والنشر
             </h3>
             <ol className="list-decimal list-inside space-y-1 mr-2">
@@ -65,8 +64,8 @@ export const AboutDialog = () => {
           </section>
 
           {/* Game Rules */}
-          <section className="bg-white/50 rounded-lg p-3">
-            <h3 className="font-bold text-sky-700 mb-2 flex items-center gap-2">
+          <section className="bg-muted/50 rounded-lg p-3">
+            <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
               <span>🎮</span> نظام اللعب والقوانين
             </h3>
             <ul className="list-disc list-inside space-y-1 mr-2">
@@ -79,8 +78,8 @@ export const AboutDialog = () => {
           </section>
 
           {/* Difficulty Levels */}
-          <section className="bg-white/50 rounded-lg p-3">
-            <h3 className="font-bold text-sky-700 mb-2 flex items-center gap-2">
+          <section className="bg-muted/50 rounded-lg p-3">
+            <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
               <span>⚡</span> مستويات الصعوبة
             </h3>
             <div className="space-y-2">
@@ -89,7 +88,7 @@ export const AboutDialog = () => {
             </div>
           </section>
 
-          <p className="text-center text-xs text-sky-600 pt-2">
+          <p className="text-center text-xs text-muted-foreground pt-2">
             تم تطوير هذا المشروع كجزء من المتطلبات الأكاديمية
           </p>
         </div>
