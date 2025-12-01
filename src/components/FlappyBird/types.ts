@@ -6,6 +6,8 @@ export interface Bird {
   width: number;
   height: number;
   hasShield?: boolean;
+  hasWeapon?: boolean;
+  weaponAmmo?: number;
 }
 
 export interface Pipe {
@@ -32,7 +34,7 @@ export interface Coin {
   rotation: number;
 }
 
-export type EnemyType = 'bird' | 'missile';
+export type EnemyType = 'bird' | 'missile' | 'hunter' | 'plane';
 
 export interface Enemy {
   x: number;
@@ -43,6 +45,26 @@ export interface Enemy {
   velocityX: number;
   velocityY: number;
   rotation: number;
+  health?: number;
+  lastShot?: number;
+  shotInterval?: number;
+}
+
+export interface Bullet {
+  x: number;
+  y: number;
+  velocityX: number;
+  velocityY: number;
+  fromPlayer: boolean;
+  radius: number;
+}
+
+export interface Bomb {
+  x: number;
+  y: number;
+  velocityX: number;
+  velocityY: number;
+  radius: number;
 }
 
 export interface Shield {
@@ -51,6 +73,35 @@ export interface Shield {
   radius: number;
   collected: boolean;
   rotation: number;
+}
+
+export interface Weapon {
+  x: number;
+  y: number;
+  radius: number;
+  collected: boolean;
+  rotation: number;
+  ammo: number;
+}
+
+export interface Particle {
+  x: number;
+  y: number;
+  velocityX: number;
+  velocityY: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+  type: 'spark' | 'explosion' | 'coin' | 'star';
+}
+
+export interface Lightning {
+  startX: number;
+  startY: number;
+  points: { x: number; y: number }[];
+  life: number;
+  maxLife: number;
 }
 
 export type Difficulty = 'easy' | 'hard' | 'crazy';
@@ -79,6 +130,8 @@ export interface GameConfig {
   coinSpawnChance?: number;
   enemySpawnInterval?: number;
   shieldSpawnChance?: number;
+  weaponSpawnChance?: number;
+  advancedEnemiesScore?: number;
 }
 
 export const COIN_VALUES: Record<CoinType, number> = {
@@ -120,5 +173,7 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, GameConfig> = {
     coinSpawnChance: 0.7,
     enemySpawnInterval: 3,
     shieldSpawnChance: 0.15,
+    weaponSpawnChance: 0.12,
+    advancedEnemiesScore: 20,
   },
 };
