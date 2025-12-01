@@ -622,7 +622,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         }
       }
       
-      return enemy.x > -100 && (enemy.health || 1) > 0;
+      return enemy.x > -100 && (enemy.health === undefined ? true : enemy.health > 0);
     });
 
     // Update bullets
