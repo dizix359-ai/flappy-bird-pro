@@ -1,26 +1,26 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS, Coin, CoinType, Enemy, Shield, COIN_VALUES } from './types';
+import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS, Coin, CoinType, Enemy, Shield, Weapon, Bullet, Bomb, Particle, Lightning, COIN_VALUES } from './types';
 import { useGameLoop } from './useGameLoop';
 
 const COLORS = {
   skyTop: '#87CEEB',
   skyBottom: '#B0E0E6',
-  crazySkyTop: '#1a0a2e',
-  crazySkyBottom: '#16213e',
+  crazySkyTop: '#0a0015',
+  crazySkyBottom: '#1a0a30',
   pipeMain: '#3D8B40',
   pipeHighlight: '#4CAF50',
   pipeShadow: '#2E7D32',
   pipeBorder: '#1B5E20',
-  crazyPipeMain: '#8B008B',
-  crazyPipeHighlight: '#9932CC',
-  crazyPipeShadow: '#4B0082',
-  crazyPipeBorder: '#2E0854',
+  crazyPipeMain: '#6B0F9C',
+  crazyPipeHighlight: '#9C27B0',
+  crazyPipeShadow: '#38006b',
+  crazyPipeBorder: '#1a0033',
   ground: '#8B6914',
   groundTop: '#4CAF50',
   groundPattern: '#7CB342',
-  crazyGround: '#2d1b4e',
-  crazyGroundTop: '#6B238E',
-  crazyGroundPattern: '#9932CC',
+  crazyGround: '#1a0033',
+  crazyGroundTop: '#4A148C',
+  crazyGroundPattern: '#7B1FA2',
 };
 
 interface GameCanvasProps {
@@ -48,23 +48,84 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     width: 40,
     height: 30,
     hasShield: false,
+    hasWeapon: false,
+    weaponAmmo: 0,
   });
   const pipesRef = useRef<Pipe[]>([]);
   const coinsRef = useRef<Coin[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
   const shieldsRef = useRef<Shield[]>([]);
+  const weaponsRef = useRef<Weapon[]>([]);
+  const bulletsRef = useRef<Bullet[]>([]);
+  const bombsRef = useRef<Bomb[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
+  const lightningsRef = useRef<Lightning[]>([]);
   const pipeTimerRef = useRef(0);
   const enemyTimerRef = useRef(0);
+  const advancedEnemyTimerRef = useRef(0);
+  const weaponTimerRef = useRef(0);
+  const lightningTimerRef = useRef(0);
   const groundOffsetRef = useRef(0);
   const wingAngleRef = useRef(0);
   const lastJumpTimeRef = useRef(0);
   const totalCoinsRef = useRef(0);
+  const starsRef = useRef<{ x: number; y: number; size: number; twinkle: number }[]>([]);
 
   const isCrazyMode = gameState.difficulty === 'crazy';
+
+  // Initialize stars
+  useEffect(() => {
+    starsRef.current = Array.from({ length: 80 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * (height - 100),
+      size: 0.5 + Math.random() * 2,
+      twinkle: Math.random() * Math.PI * 2,
+    }));
+  }, [width, height]);
 
   useEffect(() => {
     configRef.current = DIFFICULTY_CONFIGS[gameState.difficulty];
   }, [gameState.difficulty]);
+
+  const createParticles = useCallback((x: number, y: number, count: number, color: string, type: 'spark' | 'explosion' | 'coin' | 'star') => {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 50 + Math.random() * 150;
+      particlesRef.current.push({
+        x,
+        y,
+        velocityX: Math.cos(angle) * speed,
+        velocityY: Math.sin(angle) * speed,
+        life: 0.5 + Math.random() * 0.5,
+        maxLife: 1,
+        color,
+        size: type === 'explosion' ? 4 + Math.random() * 4 : 2 + Math.random() * 3,
+        type,
+      });
+    }
+  }, []);
+
+  const createLightning = useCallback(() => {
+    const startX = Math.random() * width;
+    const startY = 0;
+    const points: { x: number; y: number }[] = [{ x: startX, y: startY }];
+    let currentX = startX;
+    let currentY = startY;
+    
+    while (currentY < height * 0.6) {
+      currentX += (Math.random() - 0.5) * 60;
+      currentY += 20 + Math.random() * 30;
+      points.push({ x: currentX, y: currentY });
+    }
+    
+    lightningsRef.current.push({
+      startX,
+      startY,
+      points,
+      life: 0.15,
+      maxLife: 0.15,
+    });
+  }, [width, height]);
 
   const resetGame = useCallback(() => {
     birdRef.current = {
@@ -75,13 +136,23 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       width: 40,
       height: 30,
       hasShield: false,
+      hasWeapon: false,
+      weaponAmmo: 0,
     };
     pipesRef.current = [];
     coinsRef.current = [];
     enemiesRef.current = [];
     shieldsRef.current = [];
+    weaponsRef.current = [];
+    bulletsRef.current = [];
+    bombsRef.current = [];
+    particlesRef.current = [];
+    lightningsRef.current = [];
     pipeTimerRef.current = 0;
     enemyTimerRef.current = 0;
+    advancedEnemyTimerRef.current = 0;
+    weaponTimerRef.current = 0;
+    lightningTimerRef.current = 0;
     lastJumpTimeRef.current = 0;
     totalCoinsRef.current = 0;
   }, [width, height]);
@@ -163,6 +234,19 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         rotation: 0,
       });
     }
+
+    // Spawn weapon occasionally
+    if (config.weaponSpawnChance && Math.random() < config.weaponSpawnChance && !birdRef.current.hasWeapon) {
+      const weaponY = topHeight + config.pipeGap / 2 + (Math.random() - 0.5) * 40;
+      weaponsRef.current.push({
+        x: width + 150,
+        y: weaponY,
+        radius: 14,
+        collected: false,
+        rotation: 0,
+        ammo: 10 + Math.floor(Math.random() * 10),
+      });
+    }
   }, [width, height]);
 
   const spawnEnemy = useCallback(() => {
@@ -182,6 +266,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         velocityX: -180 - Math.random() * 80,
         velocityY: (Math.random() - 0.5) * 60,
         rotation: 0,
+        health: 1,
       });
     } else {
       enemiesRef.current.push({
@@ -193,6 +278,45 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         velocityX: -250,
         velocityY: 0,
         rotation: 0,
+        health: 1,
+      });
+    }
+  }, [width, height]);
+
+  const spawnAdvancedEnemy = useCallback(() => {
+    const config = configRef.current;
+    if (!config.hasEnemies) return;
+
+    const enemyType: 'hunter' | 'plane' = Math.random() > 0.5 ? 'plane' : 'hunter';
+    const enemyY = 80 + Math.random() * (height - config.groundHeight - 200);
+
+    if (enemyType === 'hunter') {
+      enemiesRef.current.push({
+        x: width + 60,
+        y: enemyY,
+        type: 'hunter',
+        width: 50,
+        height: 45,
+        velocityX: -80 - Math.random() * 40,
+        velocityY: 0,
+        rotation: 0,
+        health: 3,
+        lastShot: 0,
+        shotInterval: 1200 + Math.random() * 800,
+      });
+    } else {
+      enemiesRef.current.push({
+        x: width + 60,
+        y: 60 + Math.random() * 80,
+        type: 'plane',
+        width: 60,
+        height: 30,
+        velocityX: -120 - Math.random() * 60,
+        velocityY: 0,
+        rotation: 0,
+        health: 2,
+        lastShot: 0,
+        shotInterval: 1500 + Math.random() * 1000,
       });
     }
   }, [width, height]);
@@ -246,11 +370,38 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     return false;
   }, []);
 
+  const checkBulletCollision = useCallback((bird: Bird): boolean => {
+    for (const bullet of bulletsRef.current) {
+      if (bullet.fromPlayer) continue;
+      const dx = bird.x - bullet.x;
+      const dy = bird.y - bullet.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < bullet.radius + bird.width / 3) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  const checkBombCollision = useCallback((bird: Bird): boolean => {
+    for (const bomb of bombsRef.current) {
+      const dx = bird.x - bomb.x;
+      const dy = bird.y - bomb.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < bomb.radius + bird.width / 3) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
   const updateGame = useCallback((deltaTime: number) => {
     if (gameState.status !== 'playing') return;
 
     const config = configRef.current;
     const bird = birdRef.current;
+    const currentScore = gameState.score;
+    const isCrazy = gameState.difficulty === 'crazy';
     
     const dt = Math.min(deltaTime, 0.033);
     
@@ -282,6 +433,46 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       if (enemyTimerRef.current >= (config.enemySpawnInterval || 3)) {
         spawnEnemy();
         enemyTimerRef.current = 0;
+      }
+
+      // Spawn advanced enemies after score threshold
+      if (currentScore >= (config.advancedEnemiesScore || 20)) {
+        advancedEnemyTimerRef.current += dt;
+        const advancedInterval = Math.max(2, 4 - (currentScore - 20) * 0.05);
+        if (advancedEnemyTimerRef.current >= advancedInterval) {
+          spawnAdvancedEnemy();
+          advancedEnemyTimerRef.current = 0;
+        }
+      }
+    }
+
+    // Lightning in crazy mode
+    if (isCrazy) {
+      lightningTimerRef.current += dt;
+      if (lightningTimerRef.current >= 3 + Math.random() * 5) {
+        createLightning();
+        lightningTimerRef.current = 0;
+      }
+    }
+
+    // Auto-fire weapon
+    if (bird.hasWeapon && bird.weaponAmmo && bird.weaponAmmo > 0) {
+      weaponTimerRef.current += dt;
+      if (weaponTimerRef.current >= 0.3) {
+        bulletsRef.current.push({
+          x: bird.x + bird.width / 2,
+          y: bird.y,
+          velocityX: 400,
+          velocityY: 0,
+          fromPlayer: true,
+          radius: 5,
+        });
+        bird.weaponAmmo--;
+        if (bird.weaponAmmo <= 0) {
+          bird.hasWeapon = false;
+        }
+        weaponTimerRef.current = 0;
+        createParticles(bird.x + bird.width / 2, bird.y, 3, '#FFFF00', 'spark');
       }
     }
 
@@ -333,6 +524,10 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           onScore?.();
           setScoreFlash(true);
           setTimeout(() => setScoreFlash(false), 100);
+          
+          // Coin particle effect
+          const colors = { silver: '#E0E0E0', gold: '#FFD700', diamond: '#00FFFF' };
+          createParticles(coin.x, coin.y, 12, colors[coin.type], 'coin');
         }
       }
       
@@ -352,13 +547,36 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         if (distance < shield.radius + bird.width / 3) {
           shield.collected = true;
           bird.hasShield = true;
+          createParticles(shield.x, shield.y, 15, '#00FF00', 'spark');
         }
       }
       
       return shield.x > -50 && !shield.collected;
     });
 
-    // Update enemies
+    // Update weapons
+    weaponsRef.current = weaponsRef.current.filter(weapon => {
+      weapon.x -= config.pipeSpeed * dt;
+      weapon.rotation += dt * 2;
+      
+      if (!weapon.collected) {
+        const dx = bird.x - weapon.x;
+        const dy = bird.y - weapon.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < weapon.radius + bird.width / 3) {
+          weapon.collected = true;
+          bird.hasWeapon = true;
+          bird.weaponAmmo = weapon.ammo;
+          createParticles(weapon.x, weapon.y, 15, '#FF6600', 'spark');
+        }
+      }
+      
+      return weapon.x > -50 && !weapon.collected;
+    });
+
+    // Update enemies and their shooting
+    const now = performance.now();
     enemiesRef.current = enemiesRef.current.filter(enemy => {
       enemy.x += enemy.velocityX * dt;
       enemy.y += enemy.velocityY * dt;
@@ -368,20 +586,104 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         const dy = bird.y - enemy.y;
         enemy.velocityY = dy * 0.5;
         enemy.rotation = Math.atan2(enemy.velocityY, enemy.velocityX) * 180 / Math.PI;
-      } else {
+      } else if (enemy.type === 'bird') {
         enemy.y += Math.sin(performance.now() / 200 + enemy.x) * 30 * dt;
+      } else if (enemy.type === 'hunter') {
+        // Hunter hovers and shoots
+        enemy.y += Math.sin(now / 500 + enemy.x * 0.01) * 20 * dt;
+        
+        if (enemy.lastShot === undefined) enemy.lastShot = now;
+        if (now - enemy.lastShot > (enemy.shotInterval || 1500)) {
+          // Shoot bullet at player
+          const angle = Math.atan2(bird.y - enemy.y, bird.x - enemy.x);
+          bulletsRef.current.push({
+            x: enemy.x - enemy.width / 2,
+            y: enemy.y,
+            velocityX: Math.cos(angle) * 300,
+            velocityY: Math.sin(angle) * 300,
+            fromPlayer: false,
+            radius: 6,
+          });
+          enemy.lastShot = now;
+          createParticles(enemy.x - enemy.width / 2, enemy.y, 5, '#FF4444', 'spark');
+        }
+      } else if (enemy.type === 'plane') {
+        // Plane drops bombs
+        if (enemy.lastShot === undefined) enemy.lastShot = now;
+        if (now - enemy.lastShot > (enemy.shotInterval || 2000)) {
+          bombsRef.current.push({
+            x: enemy.x,
+            y: enemy.y + enemy.height / 2,
+            velocityX: enemy.velocityX * 0.3,
+            velocityY: 100,
+            radius: 10,
+          });
+          enemy.lastShot = now;
+        }
       }
       
-      return enemy.x > -100;
+      return enemy.x > -100 && (enemy.health || 1) > 0;
+    });
+
+    // Update bullets
+    bulletsRef.current = bulletsRef.current.filter(bullet => {
+      bullet.x += bullet.velocityX * dt;
+      bullet.y += bullet.velocityY * dt;
+      
+      // Check if player bullet hits enemy
+      if (bullet.fromPlayer) {
+        for (const enemy of enemiesRef.current) {
+          const dx = enemy.x - bullet.x;
+          const dy = enemy.y - bullet.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < bullet.radius + Math.max(enemy.width, enemy.height) / 2) {
+            enemy.health = (enemy.health || 1) - 1;
+            if ((enemy.health || 0) <= 0) {
+              createParticles(enemy.x, enemy.y, 20, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
+              onScoreUpdate(gameState.score + 2);
+            }
+            return false;
+          }
+        }
+      }
+      
+      return bullet.x > -20 && bullet.x < width + 20 && bullet.y > -20 && bullet.y < height + 20;
+    });
+
+    // Update bombs
+    bombsRef.current = bombsRef.current.filter(bomb => {
+      bomb.x += bomb.velocityX * dt;
+      bomb.y += bomb.velocityY * dt;
+      bomb.velocityY += 200 * dt; // Gravity
+      
+      return bomb.y < height - config.groundHeight;
+    });
+
+    // Update particles
+    particlesRef.current = particlesRef.current.filter(particle => {
+      particle.x += particle.velocityX * dt;
+      particle.y += particle.velocityY * dt;
+      particle.velocityY += 100 * dt;
+      particle.life -= dt;
+      return particle.life > 0;
+    });
+
+    // Update lightning
+    lightningsRef.current = lightningsRef.current.filter(lightning => {
+      lightning.life -= dt;
+      return lightning.life > 0;
     });
 
     // Check collisions
     const pipeCollision = checkCollision(bird, pipesRef.current);
     const enemyCollision = checkEnemyCollision(bird);
+    const bulletCollision = checkBulletCollision(bird);
+    const bombCollision = checkBombCollision(bird);
 
-    if (pipeCollision || enemyCollision) {
+    if (pipeCollision || enemyCollision || bulletCollision || bombCollision) {
       if (bird.hasShield) {
         bird.hasShield = false;
+        createParticles(bird.x, bird.y, 20, '#00FF00', 'explosion');
         // Remove the enemy that hit us
         if (enemyCollision) {
           enemiesRef.current = enemiesRef.current.filter(enemy => {
@@ -390,11 +692,29 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
             return Math.sqrt(dx * dx + dy * dy) > 50;
           });
         }
+        // Remove bullets that hit us
+        if (bulletCollision) {
+          bulletsRef.current = bulletsRef.current.filter(bullet => {
+            if (bullet.fromPlayer) return true;
+            const dx = bird.x - bullet.x;
+            const dy = bird.y - bullet.y;
+            return Math.sqrt(dx * dx + dy * dy) > 30;
+          });
+        }
+        // Remove bombs that hit us
+        if (bombCollision) {
+          bombsRef.current = bombsRef.current.filter(bomb => {
+            const dx = bird.x - bomb.x;
+            const dy = bird.y - bomb.y;
+            return Math.sqrt(dx * dx + dy * dy) > 40;
+          });
+        }
       } else {
+        createParticles(bird.x, bird.y, 30, '#FFD700', 'explosion');
         onGameOver(gameState.score);
       }
     }
-  }, [gameState.status, gameState.score, spawnPipe, spawnEnemy, checkCollision, checkEnemyCollision, onScoreUpdate, onGameOver, onScore, height]);
+  }, [gameState.status, gameState.score, gameState.difficulty, spawnPipe, spawnEnemy, spawnAdvancedEnemy, checkCollision, checkEnemyCollision, checkBulletCollision, checkBombCollision, onScoreUpdate, onGameOver, onScore, height, width, createParticles, createLightning]);
 
   const drawGame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -405,12 +725,15 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
 
     const config = configRef.current;
     const isCrazy = gameState.difficulty === 'crazy';
+    const currentScore = gameState.score;
+    const time = performance.now();
 
     // Sky
     const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
     if (isCrazy) {
       skyGradient.addColorStop(0, COLORS.crazySkyTop);
-      skyGradient.addColorStop(1, COLORS.crazySkyBottom);
+      skyGradient.addColorStop(0.5, COLORS.crazySkyBottom);
+      skyGradient.addColorStop(1, '#2d1b4e');
     } else {
       skyGradient.addColorStop(0, COLORS.skyTop);
       skyGradient.addColorStop(1, COLORS.skyBottom);
@@ -418,23 +741,64 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Stars in crazy mode
+    // Stars in crazy mode (animated)
     if (isCrazy) {
-      const time = performance.now();
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      for (let i = 0; i < 30; i++) {
-        const x = (i * 47 + time / 100) % width;
-        const y = (i * 31) % (height - 100);
-        const size = 1 + Math.sin(time / 500 + i) * 0.5;
+      starsRef.current.forEach((star, i) => {
+        const twinkle = Math.sin(time / 300 + star.twinkle) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + twinkle * 0.7})`;
+        ctx.shadowColor = '#FFFFFF';
+        ctx.shadowBlur = star.size * 2;
         ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.arc(star.x, star.y, star.size * (0.5 + twinkle * 0.5), 0, Math.PI * 2);
         ctx.fill();
-      }
+        ctx.shadowBlur = 0;
+      });
+
+      // Nebula effect
+      const nebulaGradient = ctx.createRadialGradient(width * 0.7, height * 0.3, 0, width * 0.7, height * 0.3, 200);
+      nebulaGradient.addColorStop(0, 'rgba(138, 43, 226, 0.15)');
+      nebulaGradient.addColorStop(0.5, 'rgba(75, 0, 130, 0.08)');
+      nebulaGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = nebulaGradient;
+      ctx.fillRect(0, 0, width, height);
     }
 
-    // Clouds (dimmer in crazy mode)
-    ctx.fillStyle = isCrazy ? 'rgba(100, 80, 150, 0.4)' : 'rgba(255, 255, 255, 0.7)';
-    const time = performance.now();
+    // Lightning
+    lightningsRef.current.forEach(lightning => {
+      const alpha = lightning.life / lightning.maxLife;
+      ctx.strokeStyle = `rgba(200, 220, 255, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#88AAFF';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.moveTo(lightning.points[0].x, lightning.points[0].y);
+      for (let i = 1; i < lightning.points.length; i++) {
+        ctx.lineTo(lightning.points[i].x, lightning.points[i].y);
+      }
+      ctx.stroke();
+      
+      // Branches
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(180, 200, 255, ${alpha * 0.6})`;
+      for (let i = 2; i < lightning.points.length - 1; i += 2) {
+        if (Math.random() > 0.5) {
+          ctx.beginPath();
+          ctx.moveTo(lightning.points[i].x, lightning.points[i].y);
+          ctx.lineTo(lightning.points[i].x + (Math.random() - 0.5) * 40, lightning.points[i].y + 20);
+          ctx.stroke();
+        }
+      }
+      ctx.shadowBlur = 0;
+    });
+
+    // Clouds (with glow in crazy mode)
+    if (isCrazy) {
+      ctx.fillStyle = 'rgba(80, 40, 120, 0.4)';
+      ctx.shadowColor = '#8B00FF';
+      ctx.shadowBlur = 15;
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    }
     const clouds = [
       { x: (time / 60) % (width + 150) - 75, y: 55, s: 35 },
       { x: ((time / 50) + 250) % (width + 150) - 75, y: 100, s: 42 },
@@ -446,8 +810,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.arc(c.x + c.s * 1.2, c.y, c.s * 0.5, 0, Math.PI * 2);
       ctx.fill();
     });
+    ctx.shadowBlur = 0;
 
-    // Pipes
+    // Pipes with enhanced visuals
     pipesRef.current.forEach(pipe => {
       const pipeColors = isCrazy ? {
         shadow: COLORS.crazyPipeShadow,
@@ -460,6 +825,12 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         highlight: COLORS.pipeHighlight,
         border: COLORS.pipeBorder,
       };
+
+      // Pipe glow in crazy mode
+      if (isCrazy && pipe.moving) {
+        ctx.shadowColor = '#FF00FF';
+        ctx.shadowBlur = 15;
+      }
 
       const pg = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipe.width, 0);
       pg.addColorStop(0, pipeColors.shadow);
@@ -478,30 +849,46 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.strokeRect(pipe.x - 5, pipe.topHeight - 28, pipe.width + 10, 28);
       ctx.strokeRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 28);
 
-      // Moving pipe indicator
+      // Danger indicator for moving pipes
       if (pipe.moving && isCrazy) {
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
+        const pulseAlpha = 0.2 + Math.sin(time / 200) * 0.1;
+        ctx.fillStyle = `rgba(255, 0, 255, ${pulseAlpha})`;
         ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
         ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, height - pipe.bottomY - config.groundHeight);
+        
+        // Warning symbols
+        ctx.fillStyle = '#FF00FF';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠', pipe.x + pipe.width / 2, pipe.topHeight - 35);
+        ctx.fillText('⚠', pipe.x + pipe.width / 2, pipe.bottomY + 42);
       }
+      ctx.shadowBlur = 0;
     });
 
-    // Draw coins
+    // Draw coins with enhanced effects
     coinsRef.current.forEach(coin => {
       ctx.save();
       ctx.translate(coin.x, coin.y);
       ctx.rotate(coin.rotation);
       
       const colors = {
-        silver: { main: '#C0C0C0', shine: '#E8E8E8', border: '#808080' },
-        gold: { main: '#FFD700', shine: '#FFED4A', border: '#B8860B' },
-        diamond: { main: '#00FFFF', shine: '#FFFFFF', border: '#008B8B' },
+        silver: { main: '#C0C0C0', shine: '#FFFFFF', border: '#808080', glow: '#E0E0E0' },
+        gold: { main: '#FFD700', shine: '#FFED4A', border: '#B8860B', glow: '#FFA500' },
+        diamond: { main: '#00FFFF', shine: '#FFFFFF', border: '#008B8B', glow: '#00CED1' },
       };
       const c = colors[coin.type];
       
-      // Glow
-      ctx.shadowColor = c.main;
-      ctx.shadowBlur = 10;
+      // Enhanced glow
+      ctx.shadowColor = c.glow;
+      ctx.shadowBlur = 20;
+      
+      // Outer glow ring
+      ctx.strokeStyle = c.glow;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, coin.radius + 4 + Math.sin(time / 150) * 2, 0, Math.PI * 2);
+      ctx.stroke();
       
       ctx.fillStyle = c.main;
       ctx.beginPath();
@@ -538,18 +925,19 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.restore();
     });
 
-    // Draw shields
+    // Draw shields with enhanced effects
     shieldsRef.current.forEach(shield => {
       ctx.save();
       ctx.translate(shield.x, shield.y);
       ctx.rotate(shield.rotation);
       
-      // Glow
+      // Pulsing glow
+      const pulse = Math.sin(time / 200) * 0.3 + 0.7;
       ctx.shadowColor = '#00FF00';
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 25 * pulse;
       
       // Shield shape
-      ctx.fillStyle = 'rgba(0, 255, 100, 0.7)';
+      ctx.fillStyle = `rgba(0, 255, 100, ${0.5 + pulse * 0.3})`;
       ctx.beginPath();
       ctx.moveTo(0, -shield.radius);
       ctx.lineTo(shield.radius, -shield.radius / 2);
@@ -562,29 +950,66 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       
       ctx.shadowBlur = 0;
       ctx.strokeStyle = '#00AA00';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
       
-      // Inner shine
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.beginPath();
-      ctx.arc(0, -2, shield.radius / 2, 0, Math.PI * 2);
-      ctx.fill();
+      // Shield icon
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🛡', 0, 0);
       
       ctx.restore();
     });
 
-    // Draw enemies
+    // Draw weapons
+    weaponsRef.current.forEach(weapon => {
+      ctx.save();
+      ctx.translate(weapon.x, weapon.y);
+      ctx.rotate(weapon.rotation);
+      
+      // Glow
+      ctx.shadowColor = '#FF6600';
+      ctx.shadowBlur = 20;
+      
+      // Weapon shape (gun)
+      ctx.fillStyle = '#444444';
+      ctx.fillRect(-weapon.radius, -5, weapon.radius * 2, 10);
+      ctx.fillStyle = '#FF6600';
+      ctx.fillRect(-weapon.radius + 5, -3, weapon.radius - 5, 6);
+      
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#222222';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-weapon.radius, -5, weapon.radius * 2, 10);
+      
+      // Ammo indicator
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '8px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${weapon.ammo}`, 0, -12);
+      
+      ctx.restore();
+    });
+
+    // Draw enemies with enhanced visuals
     enemiesRef.current.forEach(enemy => {
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
       
       if (enemy.type === 'bird') {
-        // Enemy bird (red/black)
-        ctx.rotate((Math.sin(performance.now() / 100) * 10) * Math.PI / 180);
+        // Enemy bird (red/black) with glow
+        ctx.rotate((Math.sin(time / 100) * 10) * Math.PI / 180);
+        
+        ctx.shadowColor = '#FF0000';
+        ctx.shadowBlur = 10;
         
         // Body
-        ctx.fillStyle = '#8B0000';
+        const bodyGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, enemy.width / 2);
+        bodyGrad.addColorStop(0, '#CC0000');
+        bodyGrad.addColorStop(1, '#660000');
+        ctx.fillStyle = bodyGrad;
         ctx.beginPath();
         ctx.ellipse(0, 0, enemy.width / 2, enemy.height / 2, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -592,78 +1017,285 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         ctx.lineWidth = 2;
         ctx.stroke();
         
+        ctx.shadowBlur = 0;
+        
         // Wing
-        ctx.fillStyle = '#660000';
-        const wy = Math.sin(performance.now() / 50) * 5;
+        ctx.fillStyle = '#990000';
+        const wy = Math.sin(time / 50) * 5;
         ctx.beginPath();
         ctx.ellipse(5, wy, 10, 7, 0.3, 0, Math.PI * 2);
         ctx.fill();
         
-        // Eye
+        // Angry eye
         ctx.fillStyle = '#FF0000';
         ctx.beginPath();
-        ctx.arc(-enemy.width / 4, -enemy.height / 6, 5, 0, Math.PI * 2);
+        ctx.arc(-enemy.width / 4, -enemy.height / 6, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.arc(-enemy.width / 4 - 1, -enemy.height / 6, 2, 0, Math.PI * 2);
+        ctx.arc(-enemy.width / 4 - 1, -enemy.height / 6, 3, 0, Math.PI * 2);
         ctx.fill();
+        // Angry eyebrow
+        ctx.strokeStyle = '#4A0000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-enemy.width / 4 - 6, -enemy.height / 6 - 8);
+        ctx.lineTo(-enemy.width / 4 + 4, -enemy.height / 6 - 4);
+        ctx.stroke();
         
         // Beak
         ctx.fillStyle = '#FF6600';
         ctx.beginPath();
         ctx.moveTo(-enemy.width / 2, 0);
-        ctx.lineTo(-enemy.width / 2 - 12, 3);
-        ctx.lineTo(-enemy.width / 2, 6);
+        ctx.lineTo(-enemy.width / 2 - 15, 3);
+        ctx.lineTo(-enemy.width / 2, 8);
         ctx.closePath();
         ctx.fill();
-      } else {
-        // Missile
+        
+      } else if (enemy.type === 'missile') {
+        // Missile with enhanced trail
         ctx.rotate(enemy.rotation * Math.PI / 180);
+        
+        ctx.shadowColor = '#FF4444';
+        ctx.shadowBlur = 15;
         
         // Body
         const missileGrad = ctx.createLinearGradient(-enemy.width / 2, 0, enemy.width / 2, 0);
-        missileGrad.addColorStop(0, '#FF4444');
+        missileGrad.addColorStop(0, '#FF6666');
         missileGrad.addColorStop(0.5, '#FF0000');
-        missileGrad.addColorStop(1, '#AA0000');
+        missileGrad.addColorStop(1, '#880000');
         ctx.fillStyle = missileGrad;
         ctx.beginPath();
         ctx.ellipse(0, 0, enemy.width / 2, enemy.height / 2, 0, 0, Math.PI * 2);
         ctx.fill();
         
+        ctx.shadowBlur = 0;
+        
         // Tip
         ctx.fillStyle = '#FFD700';
         ctx.beginPath();
         ctx.moveTo(-enemy.width / 2, 0);
-        ctx.lineTo(-enemy.width / 2 - 10, -5);
-        ctx.lineTo(-enemy.width / 2 - 10, 5);
+        ctx.lineTo(-enemy.width / 2 - 12, -6);
+        ctx.lineTo(-enemy.width / 2 - 12, 6);
         ctx.closePath();
         ctx.fill();
         
-        // Flame trail
-        ctx.fillStyle = '#FF6600';
+        // Enhanced flame trail
+        for (let i = 0; i < 5; i++) {
+          const flameX = enemy.width / 2 + 10 + i * 5 + Math.random() * 5;
+          const flameSize = 8 - i * 1.5;
+          ctx.fillStyle = i < 2 ? '#FFFF00' : i < 4 ? '#FF6600' : '#FF0000';
+          ctx.globalAlpha = 1 - i * 0.2;
+          ctx.beginPath();
+          ctx.arc(flameX, (Math.random() - 0.5) * 4, flameSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        
+      } else if (enemy.type === 'hunter') {
+        // Hunter (person with gun)
+        ctx.shadowColor = '#FF0000';
+        ctx.shadowBlur = 10;
+        
+        // Body
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-15, -20, 30, 35);
+        
+        // Head
+        ctx.fillStyle = '#DEB887';
         ctx.beginPath();
-        ctx.moveTo(enemy.width / 2, 0);
-        ctx.lineTo(enemy.width / 2 + 15 + Math.random() * 5, -3);
-        ctx.lineTo(enemy.width / 2 + 15 + Math.random() * 5, 3);
+        ctx.arc(0, -28, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Hat
+        ctx.fillStyle = '#228B22';
+        ctx.beginPath();
+        ctx.ellipse(0, -38, 15, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(-10, -45, 20, 10);
+        
+        // Gun
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(-25, -5, 20, 6);
+        ctx.fillRect(-30, -3, 8, 4);
+        
+        // Muzzle flash when shooting
+        if (enemy.lastShot && time - enemy.lastShot < 100) {
+          ctx.fillStyle = '#FFFF00';
+          ctx.beginPath();
+          ctx.arc(-32, -1, 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.shadowBlur = 0;
+        
+        // Health bar
+        if ((enemy.health || 0) > 0) {
+          ctx.fillStyle = '#333333';
+          ctx.fillRect(-15, -55, 30, 5);
+          ctx.fillStyle = '#00FF00';
+          ctx.fillRect(-15, -55, 30 * ((enemy.health || 1) / 3), 5);
+        }
+        
+      } else if (enemy.type === 'plane') {
+        // Military plane
+        ctx.shadowColor = '#444444';
+        ctx.shadowBlur = 10;
+        
+        // Body
+        const planeGrad = ctx.createLinearGradient(0, -enemy.height / 2, 0, enemy.height / 2);
+        planeGrad.addColorStop(0, '#556B2F');
+        planeGrad.addColorStop(0.5, '#6B8E23');
+        planeGrad.addColorStop(1, '#556B2F');
+        ctx.fillStyle = planeGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, enemy.width / 2, enemy.height / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Wings
+        ctx.fillStyle = '#4A5D23';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, -20);
+        ctx.lineTo(15, -20);
+        ctx.lineTo(5, 0);
         ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = '#FFFF00';
         ctx.beginPath();
-        ctx.moveTo(enemy.width / 2, 0);
-        ctx.lineTo(enemy.width / 2 + 8, -2);
-        ctx.lineTo(enemy.width / 2 + 8, 2);
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, 20);
+        ctx.lineTo(15, 20);
+        ctx.lineTo(5, 0);
         ctx.closePath();
         ctx.fill();
+        
+        // Nose
+        ctx.fillStyle = '#8B0000';
+        ctx.beginPath();
+        ctx.moveTo(-enemy.width / 2, 0);
+        ctx.lineTo(-enemy.width / 2 - 15, -5);
+        ctx.lineTo(-enemy.width / 2 - 15, 5);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Propeller
+        ctx.fillStyle = '#333333';
+        const propAngle = time / 20;
+        ctx.save();
+        ctx.translate(-enemy.width / 2 - 15, 0);
+        ctx.rotate(propAngle);
+        ctx.fillRect(-2, -15, 4, 30);
+        ctx.restore();
+        
+        ctx.shadowBlur = 0;
+        
+        // Health bar
+        if ((enemy.health || 0) > 0) {
+          ctx.fillStyle = '#333333';
+          ctx.fillRect(-20, -25, 40, 5);
+          ctx.fillStyle = '#FFFF00';
+          ctx.fillRect(-20, -25, 40 * ((enemy.health || 1) / 2), 5);
+        }
       }
       
       ctx.restore();
     });
 
-    // Ground
+    // Draw bullets
+    bulletsRef.current.forEach(bullet => {
+      ctx.save();
+      ctx.translate(bullet.x, bullet.y);
+      
+      if (bullet.fromPlayer) {
+        // Player bullet (yellow/orange)
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#FFD700';
+      } else {
+        // Enemy bullet (red)
+        ctx.shadowColor = '#FF0000';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#FF4444';
+      }
+      
+      ctx.beginPath();
+      ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Trail
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = bullet.fromPlayer ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(-bullet.radius * 2, 0, bullet.radius * 2, bullet.radius / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+    });
+
+    // Draw bombs
+    bombsRef.current.forEach(bomb => {
+      ctx.save();
+      ctx.translate(bomb.x, bomb.y);
+      
+      ctx.shadowColor = '#333333';
+      ctx.shadowBlur = 8;
+      
+      // Bomb body
+      ctx.fillStyle = '#333333';
+      ctx.beginPath();
+      ctx.arc(0, 0, bomb.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Fuse
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -bomb.radius);
+      ctx.lineTo(0, -bomb.radius - 5);
+      ctx.stroke();
+      
+      // Spark
+      ctx.fillStyle = '#FF6600';
+      ctx.beginPath();
+      ctx.arc(0, -bomb.radius - 5, 3 + Math.sin(time / 50) * 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    });
+
+    // Draw particles
+    particlesRef.current.forEach(particle => {
+      const alpha = particle.life / particle.maxLife;
+      ctx.fillStyle = particle.color;
+      ctx.globalAlpha = alpha;
+      
+      if (particle.type === 'explosion') {
+        ctx.shadowColor = particle.color;
+        ctx.shadowBlur = 10;
+      }
+      
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    });
+
+    // Ground with enhanced visuals
     const groundY = height - config.groundHeight;
+    
+    if (isCrazy) {
+      // Glowing top edge
+      ctx.shadowColor = '#9C27B0';
+      ctx.shadowBlur = 10;
+    }
+    
     ctx.fillStyle = isCrazy ? COLORS.crazyGroundTop : COLORS.groundTop;
     ctx.fillRect(0, groundY, width, 18);
+    ctx.shadowBlur = 0;
+    
     ctx.fillStyle = isCrazy ? COLORS.crazyGround : COLORS.ground;
     ctx.fillRect(0, groundY + 18, width, config.groundHeight - 18);
     
@@ -683,15 +1315,32 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.translate(bird.x, bird.y);
     ctx.rotate((bird.rotation * Math.PI) / 180);
 
-    // Shield aura
+    // Shield aura (enhanced)
     if (bird.hasShield) {
+      const shieldPulse = Math.sin(time / 150) * 0.3 + 0.7;
       ctx.shadowColor = '#00FF00';
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = 'rgba(0, 255, 100, 0.6)';
-      ctx.lineWidth = 3;
+      ctx.shadowBlur = 25 * shieldPulse;
+      ctx.strokeStyle = `rgba(0, 255, 100, ${0.4 + shieldPulse * 0.4})`;
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(0, 0, bird.width / 2 + 8, 0, Math.PI * 2);
+      ctx.arc(0, 0, bird.width / 2 + 10 + Math.sin(time / 100) * 3, 0, Math.PI * 2);
       ctx.stroke();
+      
+      // Inner shield
+      ctx.strokeStyle = `rgba(100, 255, 150, ${0.3 + shieldPulse * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, bird.width / 2 + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Weapon indicator
+    if (bird.hasWeapon) {
+      ctx.shadowColor = '#FF6600';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#444444';
+      ctx.fillRect(bird.width / 2 - 5, -3, 15, 6);
       ctx.shadowBlur = 0;
     }
 
@@ -752,26 +1401,47 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Crazy mode HUD
+    // Enhanced HUD for crazy mode
     if (isCrazy && gameState.status === 'playing') {
-      // Coins collected indicator
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(width - 80, 10, 70, 30);
+      // Background panel
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(width - 95, 5, 90, currentScore >= 20 ? 85 : 65);
+      ctx.strokeStyle = 'rgba(138, 43, 226, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(width - 95, 5, 90, currentScore >= 20 ? 85 : 65);
+      
+      // Coins collected
       ctx.fillStyle = '#FFD700';
-      ctx.font = '12px "Press Start 2P"';
+      ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'right';
-      ctx.fillText(`💰${totalCoinsRef.current}`, width - 15, 30);
+      ctx.fillText(`💰 ${totalCoinsRef.current}`, width - 15, 25);
       
       // Shield indicator
       if (bird.hasShield) {
-        ctx.fillStyle = 'rgba(0, 255, 100, 0.8)';
-        ctx.fillRect(width - 80, 45, 70, 20);
-        ctx.fillStyle = '#000';
-        ctx.font = '8px "Press Start 2P"';
-        ctx.fillText('🛡️ SHIELD', width - 15, 58);
+        ctx.fillStyle = '#00FF00';
+        ctx.fillText('🛡️ ACTIVE', width - 15, 45);
+      } else {
+        ctx.fillStyle = '#666666';
+        ctx.fillText('🛡️ ---', width - 15, 45);
+      }
+      
+      // Weapon indicator
+      if (bird.hasWeapon && bird.weaponAmmo) {
+        ctx.fillStyle = '#FF6600';
+        ctx.fillText(`🔫 ${bird.weaponAmmo}`, width - 15, 65);
+      } else {
+        ctx.fillStyle = '#666666';
+        ctx.fillText('🔫 ---', width - 15, 65);
+      }
+      
+      // Warning for advanced enemies
+      if (currentScore >= 20) {
+        ctx.fillStyle = '#FF0000';
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText('⚠️ DANGER!', width - 15, 82);
       }
     }
-  }, [width, height, scoreFlash, gameState.difficulty, gameState.status]);
+  }, [width, height, scoreFlash, gameState.difficulty, gameState.status, gameState.score]);
 
   // Game loop
   useGameLoop((deltaTime) => {
