@@ -6,8 +6,11 @@ export interface Bird {
   width: number;
   height: number;
   hasShield?: boolean;
+  shieldLevel?: 1 | 2; // 1 = normal, 2 = enhanced (3 hits)
+  shieldHits?: number; // Remaining hits for enhanced shield
   hasWeapon?: boolean;
   weaponAmmo?: number;
+  weaponLevel?: 1 | 2 | 3; // 1 = normal, 2 = lightning, 3 = fire
 }
 
 export interface Pipe {
@@ -50,6 +53,8 @@ export interface Enemy {
   shotInterval?: number;
 }
 
+export type BulletType = 'normal' | 'lightning' | 'fire';
+
 export interface Bullet {
   x: number;
   y: number;
@@ -57,6 +62,7 @@ export interface Bullet {
   velocityY: number;
   fromPlayer: boolean;
   radius: number;
+  type?: BulletType;
 }
 
 export interface Bomb {

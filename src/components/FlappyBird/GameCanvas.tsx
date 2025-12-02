@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS, Coin, CoinType, Enemy, Shield, Weapon, Bullet, Bomb, Particle, Lightning, COIN_VALUES } from './types';
+import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS, Coin, CoinType, Enemy, Shield, Weapon, Bullet, Bomb, Particle, Lightning, COIN_VALUES, BulletType } from './types';
 import { useGameLoop } from './useGameLoop';
 
 const COLORS = {
@@ -48,8 +48,11 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     width: 40,
     height: 30,
     hasShield: false,
+    shieldLevel: 1,
+    shieldHits: 1,
     hasWeapon: false,
     weaponAmmo: 0,
+    weaponLevel: 1,
   });
   const pipesRef = useRef<Pipe[]>([]);
   const coinsRef = useRef<Coin[]>([]);
@@ -458,21 +461,30 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     // Auto-fire weapon
     if (bird.hasWeapon && bird.weaponAmmo && bird.weaponAmmo > 0) {
       weaponTimerRef.current += dt;
-      if (weaponTimerRef.current >= 0.3) {
+      const fireRate = bird.weaponLevel === 3 ? 0.2 : bird.weaponLevel === 2 ? 0.25 : 0.3;
+      if (weaponTimerRef.current >= fireRate) {
+        const bulletType: BulletType = bird.weaponLevel === 3 ? 'fire' : bird.weaponLevel === 2 ? 'lightning' : 'normal';
+        const bulletSpeed = bird.weaponLevel === 3 ? 500 : bird.weaponLevel === 2 ? 450 : 400;
+        const bulletSize = bird.weaponLevel === 3 ? 7 : bird.weaponLevel === 2 ? 6 : 5;
+        
         bulletsRef.current.push({
           x: bird.x + bird.width / 2,
           y: bird.y,
-          velocityX: 400,
+          velocityX: bulletSpeed,
           velocityY: 0,
           fromPlayer: true,
-          radius: 5,
+          radius: bulletSize,
+          type: bulletType,
         });
         bird.weaponAmmo--;
         if (bird.weaponAmmo <= 0) {
           bird.hasWeapon = false;
         }
         weaponTimerRef.current = 0;
-        createParticles(bird.x + bird.width / 2, bird.y, 3, '#FFFF00', 'spark');
+        
+        // Different particle colors for different weapon levels
+        const particleColor = bulletType === 'fire' ? '#FF4500' : bulletType === 'lightning' ? '#00FFFF' : '#FFFF00';
+        createParticles(bird.x + bird.width / 2, bird.y, bulletType === 'fire' ? 5 : 3, particleColor, 'spark');
       }
     }
 
@@ -546,8 +558,20 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         
         if (distance < shield.radius + bird.width / 3) {
           shield.collected = true;
-          bird.hasShield = true;
-          createParticles(shield.x, shield.y, 15, '#00FF00', 'spark');
+          
+          // Shield upgrade system
+          if (bird.hasShield && bird.shieldLevel === 1) {
+            // Upgrade to enhanced shield
+            bird.shieldLevel = 2;
+            bird.shieldHits = 3;
+            createParticles(shield.x, shield.y, 25, '#00FFFF', 'star');
+          } else {
+            // First shield pickup
+            bird.hasShield = true;
+            bird.shieldLevel = 1;
+            bird.shieldHits = 1;
+            createParticles(shield.x, shield.y, 15, '#00FF00', 'spark');
+          }
         }
       }
       
@@ -566,9 +590,22 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         
         if (distance < weapon.radius + bird.width / 3) {
           weapon.collected = true;
-          bird.hasWeapon = true;
-          bird.weaponAmmo = weapon.ammo;
-          createParticles(weapon.x, weapon.y, 15, '#FF6600', 'spark');
+          
+          // Weapon upgrade system
+          if (bird.hasWeapon) {
+            // Upgrade weapon level
+            bird.weaponLevel = Math.min((bird.weaponLevel || 1) + 1, 3) as 1 | 2 | 3;
+            bird.weaponAmmo = (bird.weaponAmmo || 0) + weapon.ammo;
+            
+            const upgradeColor = bird.weaponLevel === 3 ? '#FF4500' : bird.weaponLevel === 2 ? '#00FFFF' : '#FF6600';
+            createParticles(weapon.x, weapon.y, 20, upgradeColor, bird.weaponLevel === 3 ? 'explosion' : 'spark');
+          } else {
+            // First weapon pickup
+            bird.hasWeapon = true;
+            bird.weaponAmmo = weapon.ammo;
+            bird.weaponLevel = 1;
+            createParticles(weapon.x, weapon.y, 15, '#FF6600', 'spark');
+          }
         }
       }
       
@@ -632,17 +669,53 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       
       // Check if player bullet hits enemy
       if (bullet.fromPlayer) {
-        for (const enemy of enemiesRef.current) {
+        for (let i = enemiesRef.current.length - 1; i >= 0; i--) {
+          const enemy = enemiesRef.current[i];
           const dx = enemy.x - bullet.x;
           const dy = enemy.y - bullet.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance < bullet.radius + Math.max(enemy.width, enemy.height) / 2) {
-            enemy.health = (enemy.health || 1) - 1;
+            const bulletType = bullet.type || 'normal';
+            const damageMultiplier = bulletType === 'fire' ? 3 : bulletType === 'lightning' ? 2 : 1;
+            
+            enemy.health = (enemy.health || 1) - damageMultiplier;
+            
+            // Enhanced explosion for fire bullets
+            const explosionColor = bulletType === 'fire' ? '#FF4500' : bulletType === 'lightning' ? '#00FFFF' : '#FF0000';
+            const explosionCount = bulletType === 'fire' ? 15 : bulletType === 'lightning' ? 12 : 8;
+            
             if ((enemy.health || 0) <= 0) {
-              createParticles(enemy.x, enemy.y, 20, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
+              createParticles(enemy.x, enemy.y, 20 + explosionCount, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
               onScoreUpdate(gameState.score + 2);
+              enemiesRef.current.splice(i, 1);
+            } else {
+              createParticles(bullet.x, bullet.y, explosionCount, explosionColor, 'explosion');
             }
+            
+            // Fire bullets create extra visual effect
+            if (bulletType === 'fire') {
+              createParticles(bullet.x, bullet.y, 10, '#FFA500', 'spark');
+            }
+            
             return false;
+          }
+        }
+      } else {
+        // Enemy bullets - check collision with bird shield
+        if (bird.hasShield && bird.shieldLevel === 2 && bird.shieldHits && bird.shieldHits > 0) {
+          const dx = bullet.x - bird.x;
+          const dy = bullet.y - bird.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < bullet.radius + bird.width / 2 + 10) {
+            // Enhanced shield absorbs bullet
+            bird.shieldHits--;
+            if (bird.shieldHits <= 0) {
+              bird.hasShield = false;
+              bird.shieldLevel = 1;
+            }
+            createParticles(bullet.x, bullet.y, 12, '#00FFFF', 'star');
+            return false; // Remove bullet
           }
         }
       }
@@ -682,8 +755,22 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
 
     if (pipeCollision || enemyCollision || bulletCollision || bombCollision) {
       if (bird.hasShield) {
-        bird.hasShield = false;
-        createParticles(bird.x, bird.y, 20, '#00FF00', 'explosion');
+        // Shield protects
+        if (bird.shieldLevel === 2 && bird.shieldHits && bird.shieldHits > 0) {
+          // Enhanced shield absorbs hit
+          bird.shieldHits--;
+          if (bird.shieldHits <= 0) {
+            bird.hasShield = false;
+            bird.shieldLevel = 1;
+          }
+          createParticles(bird.x, bird.y, 20, '#00FFFF', 'star');
+        } else {
+          // Normal shield - one hit protection
+          bird.hasShield = false;
+          bird.shieldLevel = 1;
+          createParticles(bird.x, bird.y, 20, '#00FF00', 'explosion');
+        }
+        
         // Remove the enemy that hit us
         if (enemyCollision) {
           enemiesRef.current = enemiesRef.current.filter(enemy => {
@@ -1207,28 +1294,101 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.translate(bullet.x, bullet.y);
       
       if (bullet.fromPlayer) {
-        // Player bullet (yellow/orange)
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = '#FFD700';
+        const bulletType = bullet.type || 'normal';
+        
+        if (bulletType === 'fire') {
+          // Fire bullet - orange/red with flames
+          ctx.shadowColor = '#FF4500';
+          ctx.shadowBlur = 20;
+          
+          const fireGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bullet.radius);
+          fireGrad.addColorStop(0, '#FFFF00');
+          fireGrad.addColorStop(0.5, '#FF4500');
+          fireGrad.addColorStop(1, '#8B0000');
+          ctx.fillStyle = fireGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Flame trail
+          for (let i = 0; i < 4; i++) {
+            const trailX = -bullet.radius * 2 - i * 5;
+            const trailSize = bullet.radius * (1 - i * 0.2);
+            ctx.fillStyle = i === 0 ? '#FFFF00' : i === 1 ? '#FF6600' : '#FF0000';
+            ctx.globalAlpha = 1 - i * 0.25;
+            ctx.beginPath();
+            ctx.arc(trailX, (Math.random() - 0.5) * 3, trailSize, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+          
+        } else if (bulletType === 'lightning') {
+          // Lightning bullet - cyan/electric blue
+          ctx.shadowColor = '#00FFFF';
+          ctx.shadowBlur = 15;
+          
+          const lightningGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bullet.radius);
+          lightningGrad.addColorStop(0, '#FFFFFF');
+          lightningGrad.addColorStop(0.5, '#00FFFF');
+          lightningGrad.addColorStop(1, '#0080FF');
+          ctx.fillStyle = lightningGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Electric arcs
+          ctx.strokeStyle = '#00FFFF';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            const angle = Math.random() * Math.PI * 2;
+            const length = bullet.radius + Math.random() * 5;
+            ctx.lineTo(Math.cos(angle) * length, Math.sin(angle) * length);
+            ctx.stroke();
+          }
+          
+          // Trail
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+          ctx.beginPath();
+          ctx.ellipse(-bullet.radius * 2.5, 0, bullet.radius * 2, bullet.radius / 2, 0, 0, Math.PI * 2);
+          ctx.fill();
+          
+        } else {
+          // Normal bullet (yellow/orange)
+          ctx.shadowColor = '#FFD700';
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Trail
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
+          ctx.beginPath();
+          ctx.ellipse(-bullet.radius * 2, 0, bullet.radius * 2, bullet.radius / 2, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else {
         // Enemy bullet (red)
         ctx.shadowColor = '#FF0000';
         ctx.shadowBlur = 10;
         ctx.fillStyle = '#FF4444';
+        ctx.beginPath();
+        ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Trail
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+        ctx.beginPath();
+        ctx.ellipse(-bullet.radius * 2, 0, bullet.radius * 2, bullet.radius / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
       
-      ctx.beginPath();
-      ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Trail
       ctx.shadowBlur = 0;
-      ctx.fillStyle = bullet.fromPlayer ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
-      ctx.beginPath();
-      ctx.ellipse(-bullet.radius * 2, 0, bullet.radius * 2, bullet.radius / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      
       ctx.restore();
     });
 
@@ -1318,44 +1478,127 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     // Shield aura (enhanced)
     if (bird.hasShield) {
       const shieldPulse = Math.sin(time / 150) * 0.3 + 0.7;
-      ctx.shadowColor = '#00FF00';
-      ctx.shadowBlur = 25 * shieldPulse;
-      ctx.strokeStyle = `rgba(0, 255, 100, ${0.4 + shieldPulse * 0.4})`;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(0, 0, bird.width / 2 + 10 + Math.sin(time / 100) * 3, 0, Math.PI * 2);
-      ctx.stroke();
+      const isEnhanced = bird.shieldLevel === 2;
       
-      // Inner shield
-      ctx.strokeStyle = `rgba(100, 255, 150, ${0.3 + shieldPulse * 0.3})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, bird.width / 2 + 5, 0, Math.PI * 2);
-      ctx.stroke();
+      if (isEnhanced) {
+        // Enhanced shield - brighter and more intense
+        ctx.shadowColor = '#00FFFF';
+        ctx.shadowBlur = 35 * shieldPulse;
+        
+        // Outer glow ring
+        ctx.strokeStyle = `rgba(0, 255, 255, ${0.6 + shieldPulse * 0.4})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 15 + Math.sin(time / 80) * 4, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Middle ring
+        ctx.strokeStyle = `rgba(100, 255, 255, ${0.5 + shieldPulse * 0.3})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 10, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner ring
+        ctx.strokeStyle = `rgba(200, 255, 255, ${0.4 + shieldPulse * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Electric arcs around shield
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const angle = (time / 300 + i * Math.PI * 2 / 3) % (Math.PI * 2);
+          const radius = bird.width / 2 + 12;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+          ctx.lineTo(Math.cos(angle + 0.3) * (radius + 8), Math.sin(angle + 0.3) * (radius + 8));
+          ctx.stroke();
+        }
+        
+      } else {
+        // Normal shield
+        ctx.shadowColor = '#00FF00';
+        ctx.shadowBlur = 25 * shieldPulse;
+        ctx.strokeStyle = `rgba(0, 255, 100, ${0.4 + shieldPulse * 0.4})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 10 + Math.sin(time / 100) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner shield
+        ctx.strokeStyle = `rgba(100, 255, 150, ${0.3 + shieldPulse * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.shadowBlur = 0;
     }
 
     // Weapon indicator
     if (bird.hasWeapon) {
-      ctx.shadowColor = '#FF6600';
-      ctx.shadowBlur = 10;
+      const weaponLevel = bird.weaponLevel || 1;
+      const weaponColor = weaponLevel === 3 ? '#FF4500' : weaponLevel === 2 ? '#00FFFF' : '#FF6600';
+      const weaponGlow = weaponLevel === 3 ? 15 : weaponLevel === 2 ? 12 : 10;
+      
+      ctx.shadowColor = weaponColor;
+      ctx.shadowBlur = weaponGlow;
       ctx.fillStyle = '#444444';
       ctx.fillRect(bird.width / 2 - 5, -3, 15, 6);
+      
+      // Weapon level indicator
+      ctx.fillStyle = weaponColor;
+      ctx.fillRect(bird.width / 2 - 3, -1, 11, 2);
+      
+      // Additional visual for advanced weapons
+      if (weaponLevel === 3) {
+        // Fire effect
+        ctx.fillStyle = '#FFA500';
+        ctx.beginPath();
+        ctx.arc(bird.width / 2 + 10, 0, 3 + Math.sin(time / 50) * 1, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (weaponLevel === 2) {
+        // Electric spark
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bird.width / 2 + 8, -2);
+        ctx.lineTo(bird.width / 2 + 12, 0);
+        ctx.lineTo(bird.width / 2 + 8, 2);
+        ctx.stroke();
+      }
+      
       ctx.shadowBlur = 0;
     }
 
-    // Body
+    // Body - aggressive look when enhanced shield
+    const isEnhancedShield = bird.hasShield && bird.shieldLevel === 2;
     const bg = ctx.createRadialGradient(-3, -5, 2, 0, 0, bird.width / 2);
-    bg.addColorStop(0, '#FFF176');
-    bg.addColorStop(0.5, '#FFD700');
-    bg.addColorStop(1, '#FFA000');
+    
+    if (isEnhancedShield) {
+      // Aggressive coloring
+      bg.addColorStop(0, '#FFD700');
+      bg.addColorStop(0.5, '#FF6600');
+      bg.addColorStop(1, '#CC0000');
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 8;
+    } else {
+      bg.addColorStop(0, '#FFF176');
+      bg.addColorStop(0.5, '#FFD700');
+      bg.addColorStop(1, '#FFA000');
+    }
+    
     ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#E65100';
+    ctx.strokeStyle = isEnhancedShield ? '#8B0000' : '#E65100';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Wing
     const wy = Math.sin(wingAngleRef.current) * 7;
@@ -1367,17 +1610,28 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Eye
+    // Eye - aggressive look when enhanced shield
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
     ctx.arc(bird.width / 4 + 2, -bird.height / 6, 9, 0, Math.PI * 2);
     ctx.fill();
     
     const py = Math.min(bird.velocity / 250, 3);
-    ctx.fillStyle = '#212121';
+    ctx.fillStyle = isEnhancedShield ? '#CC0000' : '#212121';
     ctx.beginPath();
     ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 4.5, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Angry glow for enhanced shield
+    if (isEnhancedShield) {
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 5;
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.9)';
+      ctx.beginPath();
+      ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
     
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
@@ -1418,8 +1672,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       
       // Shield indicator
       if (bird.hasShield) {
-        ctx.fillStyle = '#00FF00';
-        ctx.fillText('🛡️ ACTIVE', width - 15, 45);
+        if (bird.shieldLevel === 2) {
+          ctx.fillStyle = '#00FFFF';
+          ctx.fillText(`🛡️ x${bird.shieldHits || 0}`, width - 15, 45);
+        } else {
+          ctx.fillStyle = '#00FF00';
+          ctx.fillText('🛡️ ACTIVE', width - 15, 45);
+        }
       } else {
         ctx.fillStyle = '#666666';
         ctx.fillText('🛡️ ---', width - 15, 45);
@@ -1427,8 +1686,11 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       
       // Weapon indicator
       if (bird.hasWeapon && bird.weaponAmmo) {
-        ctx.fillStyle = '#FF6600';
-        ctx.fillText(`🔫 ${bird.weaponAmmo}`, width - 15, 65);
+        const weaponLevel = bird.weaponLevel || 1;
+        const weaponColor = weaponLevel === 3 ? '#FF4500' : weaponLevel === 2 ? '#00FFFF' : '#FF6600';
+        const weaponIcon = weaponLevel === 3 ? '🔥' : weaponLevel === 2 ? '⚡' : '🔫';
+        ctx.fillStyle = weaponColor;
+        ctx.fillText(`${weaponIcon} ${bird.weaponAmmo}`, width - 15, 65);
       } else {
         ctx.fillStyle = '#666666';
         ctx.fillText('🔫 ---', width - 15, 65);
