@@ -1548,9 +1548,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
 
     ctx.restore();
 
-    // Score flash
-    if (scoreFlash) {
-      ctx.fillStyle = isCrazy ? 'rgba(255, 0, 255, 0.2)' : 'rgba(255, 215, 0, 0.2)';
+    // Score flash (disabled in crazy mode to avoid visual distraction)
+    if (scoreFlash && !isCrazy) {
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
       ctx.fillRect(0, 0, width, height);
     }
 
