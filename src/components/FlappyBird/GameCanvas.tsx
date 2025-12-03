@@ -716,25 +716,31 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           const distance = Math.sqrt(dx * dx + dy * dy);
           if (distance < bullet.radius + Math.max(enemy.width, enemy.height) / 2) {
             const bulletType = bullet.type || 'normal';
-            const damageMultiplier = bulletType === 'fire' ? 3 : bulletType === 'lightning' ? 2 : 1;
+            // Lightning and fire bullets instant kill, normal does 1 damage
+            const damageMultiplier = bulletType === 'fire' ? 999 : bulletType === 'lightning' ? 999 : 1;
             
             enemy.health = (enemy.health || 1) - damageMultiplier;
             
-            // Enhanced explosion for fire bullets
-            const explosionColor = bulletType === 'fire' ? '#FF4500' : bulletType === 'lightning' ? '#00FFFF' : '#FF0000';
-            const explosionCount = bulletType === 'fire' ? 10 : bulletType === 'lightning' ? 8 : 6;
-            
+            // Enhanced explosion effects based on bullet type
             if ((enemy.health || 0) <= 0) {
-              createParticles(enemy.x, enemy.y, 15, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
+              if (bulletType === 'lightning') {
+                // Electric death explosion
+                createParticles(enemy.x, enemy.y, 20, '#00FFFF', 'explosion');
+                createParticles(enemy.x, enemy.y, 10, '#FFFFFF', 'star');
+                createParticles(enemy.x, enemy.y, 8, '#0080FF', 'spark');
+              } else if (bulletType === 'fire') {
+                // Fiery death explosion
+                createParticles(enemy.x, enemy.y, 25, '#FF4500', 'explosion');
+                createParticles(enemy.x, enemy.y, 15, '#FFFF00', 'spark');
+                createParticles(enemy.x, enemy.y, 10, '#FF0000', 'explosion');
+              } else {
+                createParticles(enemy.x, enemy.y, 15, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
+              }
               onScoreUpdate(gameState.score + 2);
               enemiesRef.current.splice(i, 1);
             } else {
-              createParticles(bullet.x, bullet.y, explosionCount, explosionColor, 'explosion');
-            }
-            
-            // Fire bullets create extra visual effect (reduced)
-            if (bulletType === 'fire') {
-              createParticles(bullet.x, bullet.y, 5, '#FFA500', 'spark');
+              const explosionColor = bulletType === 'fire' ? '#FF4500' : bulletType === 'lightning' ? '#00FFFF' : '#FF0000';
+              createParticles(bullet.x, bullet.y, 8, explosionColor, 'explosion');
             }
             
             return false;
@@ -1457,58 +1463,100 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         const bulletType = bullet.type || 'normal';
         
         if (bulletType === 'fire') {
-          // Fire bullet - orange/red with flames (optimized)
+          // ENHANCED Fire bullet - intense flames and glow
+          const pulseSize = bullet.radius + Math.sin(time / 30) * 2;
           
-          const fireGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bullet.radius);
-          fireGrad.addColorStop(0, '#FFFF00');
-          fireGrad.addColorStop(0.5, '#FF4500');
+          // Outer glow
+          ctx.shadowColor = '#FF4500';
+          ctx.shadowBlur = 15;
+          
+          // Core fireball
+          const fireGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, pulseSize);
+          fireGrad.addColorStop(0, '#FFFFFF');
+          fireGrad.addColorStop(0.2, '#FFFF00');
+          fireGrad.addColorStop(0.5, '#FF6600');
+          fireGrad.addColorStop(0.8, '#FF4500');
           fireGrad.addColorStop(1, '#8B0000');
           ctx.fillStyle = fireGrad;
           ctx.beginPath();
-          ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+          ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
           ctx.fill();
           
-          // Flame trail (reduced)
-          for (let i = 0; i < 2; i++) {
-            const trailX = -bullet.radius * 2 - i * 6;
-            const trailSize = bullet.radius * (1 - i * 0.3);
-            ctx.fillStyle = i === 0 ? '#FFFF00' : '#FF6600';
-            ctx.globalAlpha = 1 - i * 0.4;
+          ctx.shadowBlur = 0;
+          
+          // Intense flame trail
+          for (let i = 0; i < 5; i++) {
+            const trailX = -bullet.radius * 1.5 - i * 7;
+            const trailSize = bullet.radius * (1.2 - i * 0.2);
+            const yOffset = Math.sin(time / 30 + i) * 3;
+            const colors = ['#FFFFFF', '#FFFF00', '#FF6600', '#FF4500', '#8B0000'];
+            ctx.fillStyle = colors[i];
+            ctx.globalAlpha = 1 - i * 0.18;
             ctx.beginPath();
-            ctx.arc(trailX, 0, trailSize, 0, Math.PI * 2);
+            ctx.arc(trailX, yOffset, trailSize, 0, Math.PI * 2);
             ctx.fill();
           }
+          
+          // Fire sparks around bullet
           ctx.globalAlpha = 1;
+          for (let i = 0; i < 4; i++) {
+            const sparkAngle = (time / 50 + i * Math.PI / 2) % (Math.PI * 2);
+            const sparkDist = bullet.radius + 4 + Math.sin(time / 30 + i) * 2;
+            ctx.fillStyle = '#FFFF00';
+            ctx.beginPath();
+            ctx.arc(Math.cos(sparkAngle) * sparkDist, Math.sin(sparkAngle) * sparkDist, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
           
         } else if (bulletType === 'lightning') {
-          // Lightning bullet - cyan/electric blue (optimized)
+          // ENHANCED Lightning bullet - electric and powerful
+          const pulseSize = bullet.radius + Math.sin(time / 20) * 1.5;
           
-          const lightningGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bullet.radius);
+          // Electric glow
+          ctx.shadowColor = '#00FFFF';
+          ctx.shadowBlur = 20;
+          
+          // Core energy ball
+          const lightningGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, pulseSize);
           lightningGrad.addColorStop(0, '#FFFFFF');
-          lightningGrad.addColorStop(0.5, '#00FFFF');
-          lightningGrad.addColorStop(1, '#0080FF');
+          lightningGrad.addColorStop(0.3, '#AAFFFF');
+          lightningGrad.addColorStop(0.6, '#00FFFF');
+          lightningGrad.addColorStop(1, '#0040FF');
           ctx.fillStyle = lightningGrad;
           ctx.beginPath();
-          ctx.arc(0, 0, bullet.radius, 0, Math.PI * 2);
+          ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
           ctx.fill();
           
-          // Electric arcs (reduced)
+          ctx.shadowBlur = 0;
+          
+          // Electric arcs shooting out
           ctx.strokeStyle = '#00FFFF';
-          ctx.lineWidth = 1;
-          for (let i = 0; i < 2; i++) {
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 6; i++) {
+            const angle = (time / 40 + i * Math.PI / 3) % (Math.PI * 2);
+            const length = bullet.radius + 8 + Math.sin(time / 25 + i) * 4;
             ctx.beginPath();
             ctx.moveTo(0, 0);
-            const angle = Math.random() * Math.PI * 2;
-            const length = bullet.radius + 3;
+            // Zigzag lightning pattern
+            const midX = Math.cos(angle) * length * 0.5 + (Math.random() - 0.5) * 4;
+            const midY = Math.sin(angle) * length * 0.5 + (Math.random() - 0.5) * 4;
+            ctx.lineTo(midX, midY);
             ctx.lineTo(Math.cos(angle) * length, Math.sin(angle) * length);
             ctx.stroke();
           }
           
-          // Trail (simplified)
-          ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+          // Electric trail
+          ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
           ctx.beginPath();
-          ctx.ellipse(-bullet.radius * 2, 0, bullet.radius * 1.5, bullet.radius / 2, 0, 0, Math.PI * 2);
+          ctx.ellipse(-bullet.radius * 2.5, 0, bullet.radius * 2, bullet.radius * 0.8, 0, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Secondary electric rings
+          ctx.strokeStyle = 'rgba(100, 255, 255, 0.6)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, pulseSize + 4 + Math.sin(time / 15) * 2, 0, Math.PI * 2);
+          ctx.stroke();
           
         } else {
           // Normal bullet (yellow/orange) - optimized
@@ -1611,35 +1659,76 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       const isEnhanced = bird.shieldLevel === 2;
       
       if (isEnhanced) {
-        // Enhanced shield (optimized - reduced rings and no shadows)
-        // Outer ring
-        ctx.strokeStyle = `rgba(0, 255, 255, ${0.6 + shieldPulse * 0.4})`;
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.arc(0, 0, bird.width / 2 + 12, 0, Math.PI * 2);
-        ctx.stroke();
+        // EPIC Enhanced shield - dramatic transformation
+        const fastPulse = Math.sin(time / 80) * 0.4 + 0.6;
+        const rotationAngle = time / 500;
         
-        // Inner ring
-        ctx.strokeStyle = `rgba(100, 255, 255, ${0.5 + shieldPulse * 0.3})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, bird.width / 2 + 6, 0, Math.PI * 2);
-        ctx.stroke();
+        // Outer energy field glow
+        ctx.shadowColor = '#00FFFF';
+        ctx.shadowBlur = 25;
         
-        // Electric arcs (reduced)
-        ctx.strokeStyle = '#00FFFF';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 2; i++) {
-          const angle = (time / 300 + i * Math.PI) % (Math.PI * 2);
-          const radius = bird.width / 2 + 10;
+        // Triple rotating rings
+        for (let ring = 0; ring < 3; ring++) {
+          const ringRadius = bird.width / 2 + 8 + ring * 6;
+          const ringAlpha = 0.8 - ring * 0.2;
+          const ringRotation = rotationAngle * (ring % 2 === 0 ? 1 : -1);
+          
+          ctx.strokeStyle = `rgba(0, 255, 255, ${ringAlpha * fastPulse})`;
+          ctx.lineWidth = 4 - ring;
           ctx.beginPath();
-          ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-          ctx.lineTo(Math.cos(angle + 0.3) * (radius + 6), Math.sin(angle + 0.3) * (radius + 6));
+          ctx.arc(0, 0, ringRadius, ringRotation, ringRotation + Math.PI * 1.5);
           ctx.stroke();
         }
         
+        ctx.shadowBlur = 0;
+        
+        // Energy particles orbiting
+        for (let i = 0; i < 8; i++) {
+          const particleAngle = (time / 200 + i * Math.PI / 4) % (Math.PI * 2);
+          const particleRadius = bird.width / 2 + 15 + Math.sin(time / 100 + i) * 3;
+          const particleSize = 3 + Math.sin(time / 50 + i * 2) * 1.5;
+          
+          ctx.fillStyle = i % 2 === 0 ? '#00FFFF' : '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(
+            Math.cos(particleAngle) * particleRadius,
+            Math.sin(particleAngle) * particleRadius,
+            particleSize,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+        
+        // Electric lightning bolts
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i++) {
+          const boltAngle = (time / 150 + i * Math.PI / 2) % (Math.PI * 2);
+          const innerR = bird.width / 2 + 5;
+          const outerR = bird.width / 2 + 20;
+          
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(boltAngle) * innerR, Math.sin(boltAngle) * innerR);
+          const midR = (innerR + outerR) / 2;
+          const midAngle = boltAngle + (Math.random() - 0.5) * 0.3;
+          ctx.lineTo(Math.cos(midAngle) * midR + (Math.random() - 0.5) * 5, Math.sin(midAngle) * midR + (Math.random() - 0.5) * 5);
+          ctx.lineTo(Math.cos(boltAngle) * outerR, Math.sin(boltAngle) * outerR);
+          ctx.stroke();
+        }
+        
+        // Inner power core glow
+        const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, bird.width / 2 + 5);
+        coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        coreGrad.addColorStop(0.7, 'rgba(0, 255, 255, 0.1)');
+        coreGrad.addColorStop(1, `rgba(0, 255, 255, ${0.3 * fastPulse})`);
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, bird.width / 2 + 5, 0, Math.PI * 2);
+        ctx.fill();
+        
       } else {
-        // Normal shield (optimized - no shadows)
+        // Normal shield - simple protective aura
         ctx.strokeStyle = `rgba(0, 255, 100, ${0.4 + shieldPulse * 0.4})`;
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -1686,15 +1775,21 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       }
     }
 
-    // Body - aggressive look when enhanced shield
+    // Body - EPIC aggressive look when enhanced shield
     const isEnhancedShield = bird.hasShield && bird.shieldLevel === 2;
     const bg = ctx.createRadialGradient(-3, -5, 2, 0, 0, bird.width / 2);
     
     if (isEnhancedShield) {
-      // Aggressive coloring
-      bg.addColorStop(0, '#FFD700');
-      bg.addColorStop(0.5, '#FF6600');
-      bg.addColorStop(1, '#CC0000');
+      // Fiery aggressive coloring with pulsing effect
+      const firePulse = Math.sin(time / 100) * 0.2 + 0.8;
+      bg.addColorStop(0, '#FFFFFF');
+      bg.addColorStop(0.3, '#FFD700');
+      bg.addColorStop(0.6, `rgba(255, ${Math.floor(100 * firePulse)}, 0, 1)`);
+      bg.addColorStop(1, '#8B0000');
+      
+      // Fiery glow around bird
+      ctx.shadowColor = '#FF4500';
+      ctx.shadowBlur = 15;
     } else {
       bg.addColorStop(0, '#FFF176');
       bg.addColorStop(0.5, '#FFD700');
@@ -1705,35 +1800,59 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.beginPath();
     ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = isEnhancedShield ? '#8B0000' : '#E65100';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isEnhancedShield ? '#FF0000' : '#E65100';
+    ctx.lineWidth = isEnhancedShield ? 3 : 2;
     ctx.stroke();
+    
+    ctx.shadowBlur = 0;
 
-    // Wing
+    // Wing - fiery when enhanced
     const wy = Math.sin(wingAngleRef.current) * 7;
-    ctx.fillStyle = '#FFA500';
+    ctx.fillStyle = isEnhancedShield ? '#FF6600' : '#FFA500';
     ctx.beginPath();
     ctx.ellipse(-5, wy, 13, 9, -0.3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#BF360C';
+    ctx.strokeStyle = isEnhancedShield ? '#8B0000' : '#BF360C';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Eye - aggressive look when enhanced shield
+    // Eye - GLOWING RAGE when enhanced shield
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
     ctx.arc(bird.width / 4 + 2, -bird.height / 6, 9, 0, Math.PI * 2);
     ctx.fill();
     
     const py = Math.min(bird.velocity / 250, 3);
-    ctx.fillStyle = isEnhancedShield ? '#CC0000' : '#212121';
-    ctx.beginPath();
-    ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 4.5, 0, Math.PI * 2);
-    ctx.fill();
     
-    // Angry glow for enhanced shield (optimized - no shadow)
     if (isEnhancedShield) {
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.9)';
+      // Glowing red eye with outer glow
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 10;
+      
+      // Red iris
+      const eyeGlow = ctx.createRadialGradient(
+        bird.width / 4 + 4, -bird.height / 6 + py, 0,
+        bird.width / 4 + 4, -bird.height / 6 + py, 5
+      );
+      eyeGlow.addColorStop(0, '#FFFF00');
+      eyeGlow.addColorStop(0.5, '#FF0000');
+      eyeGlow.addColorStop(1, '#8B0000');
+      ctx.fillStyle = eyeGlow;
+      ctx.beginPath();
+      ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.shadowBlur = 0;
+      
+      // Angry eyebrow
+      ctx.strokeStyle = '#8B0000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bird.width / 4 - 4, -bird.height / 6 - 10);
+      ctx.lineTo(bird.width / 4 + 10, -bird.height / 6 - 5);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#212121';
       ctx.beginPath();
       ctx.arc(bird.width / 4 + 4, -bird.height / 6 + py, 4.5, 0, Math.PI * 2);
       ctx.fill();
