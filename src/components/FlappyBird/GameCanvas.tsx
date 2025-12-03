@@ -73,17 +73,49 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const lastJumpTimeRef = useRef(0);
   const totalCoinsRef = useRef(0);
   const starsRef = useRef<{ x: number; y: number; size: number; twinkle: number }[]>([]);
+  const mountainsRef = useRef<{ x: number; height: number; color: string }[]>([]);
+  const meteorsRef = useRef<{ x: number; y: number; speed: number; angle: number; length: number; life: number }[]>([]);
+  const bgBirdsRef = useRef<{ x: number; y: number; speed: number; wingPhase: number }[]>([]);
+  const planetsRef = useRef<{ x: number; y: number; radius: number; color: string; ringColor?: string }[]>([]);
 
   const isCrazyMode = gameState.difficulty === 'crazy';
 
-  // Initialize stars (reduced count for performance)
+  // Initialize environment elements
   useEffect(() => {
-    starsRef.current = Array.from({ length: 50 }, () => ({
+    // Stars
+    starsRef.current = Array.from({ length: 60 }, () => ({
       x: Math.random() * width,
-      y: Math.random() * (height - 100),
+      y: Math.random() * (height - 150),
       size: 0.5 + Math.random() * 2,
       twinkle: Math.random() * Math.PI * 2,
     }));
+    
+    // Mountains/Buildings for parallax
+    mountainsRef.current = [
+      // Far layer (slowest)
+      { x: 0, height: height * 0.35, color: 'rgba(20, 10, 40, 0.8)' },
+      { x: width * 0.3, height: height * 0.3, color: 'rgba(25, 12, 45, 0.8)' },
+      { x: width * 0.6, height: height * 0.38, color: 'rgba(20, 10, 40, 0.8)' },
+      { x: width * 0.9, height: height * 0.32, color: 'rgba(25, 12, 45, 0.8)' },
+      // Near layer (faster)
+      { x: width * 0.15, height: height * 0.25, color: 'rgba(40, 20, 60, 0.9)' },
+      { x: width * 0.5, height: height * 0.22, color: 'rgba(45, 22, 65, 0.9)' },
+      { x: width * 0.8, height: height * 0.28, color: 'rgba(40, 20, 60, 0.9)' },
+    ];
+    
+    // Background birds
+    bgBirdsRef.current = Array.from({ length: 4 }, () => ({
+      x: Math.random() * width,
+      y: 50 + Math.random() * 150,
+      speed: 20 + Math.random() * 30,
+      wingPhase: Math.random() * Math.PI * 2,
+    }));
+    
+    // Planets
+    planetsRef.current = [
+      { x: width * 0.85, y: height * 0.12, radius: 30, color: '#4a2c7a', ringColor: 'rgba(200, 150, 255, 0.3)' },
+      { x: width * 0.2, y: height * 0.08, radius: 15, color: '#3d5a80' },
+    ];
   }, [width, height]);
 
   useEffect(() => {
@@ -823,11 +855,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     const currentScore = gameState.score;
     const time = performance.now();
 
-    // Sky
+    // Sky with dynamic gradient
     const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
     if (isCrazy) {
+      // Dynamic sky color shift
+      const skyShift = Math.sin(time / 10000) * 0.1;
       skyGradient.addColorStop(0, COLORS.crazySkyTop);
-      skyGradient.addColorStop(0.5, COLORS.crazySkyBottom);
+      skyGradient.addColorStop(0.4 + skyShift, COLORS.crazySkyBottom);
       skyGradient.addColorStop(1, '#2d1b4e');
     } else {
       skyGradient.addColorStop(0, COLORS.skyTop);
@@ -836,23 +870,196 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Stars in crazy mode (animated, optimized - no shadows)
+    // === CRAZY MODE ENHANCED ENVIRONMENT ===
     if (isCrazy) {
-      starsRef.current.forEach((star, i) => {
-        const twinkle = Math.sin(time / 300 + star.twinkle) * 0.5 + 0.5;
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + twinkle * 0.7})`;
+      // Distant planets
+      planetsRef.current.forEach(planet => {
+        // Planet body
+        const planetGrad = ctx.createRadialGradient(
+          planet.x - planet.radius * 0.3, planet.y - planet.radius * 0.3, 0,
+          planet.x, planet.y, planet.radius
+        );
+        planetGrad.addColorStop(0, planet.color);
+        planetGrad.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+        ctx.fillStyle = planetGrad;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size * (0.5 + twinkle * 0.5), 0, Math.PI * 2);
+        ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Ring (if present)
+        if (planet.ringColor) {
+          ctx.strokeStyle = planet.ringColor;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(planet.x, planet.y, planet.radius * 1.8, planet.radius * 0.4, 0.3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      });
+
+      // Glowing moon
+      const moonX = width * 0.15;
+      const moonY = height * 0.18;
+      const moonRadius = 40;
+      const moonPulse = Math.sin(time / 2000) * 0.15 + 0.85;
+      
+      // Moon glow
+      const moonGlow = ctx.createRadialGradient(moonX, moonY, moonRadius * 0.5, moonX, moonY, moonRadius * 2.5);
+      moonGlow.addColorStop(0, `rgba(200, 200, 255, ${0.3 * moonPulse})`);
+      moonGlow.addColorStop(0.5, `rgba(150, 150, 220, ${0.1 * moonPulse})`);
+      moonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = moonGlow;
+      ctx.fillRect(moonX - moonRadius * 3, moonY - moonRadius * 3, moonRadius * 6, moonRadius * 6);
+      
+      // Moon body
+      const moonBodyGrad = ctx.createRadialGradient(
+        moonX - moonRadius * 0.3, moonY - moonRadius * 0.3, 0,
+        moonX, moonY, moonRadius
+      );
+      moonBodyGrad.addColorStop(0, '#E8E8F0');
+      moonBodyGrad.addColorStop(0.7, '#B8B8D0');
+      moonBodyGrad.addColorStop(1, '#888898');
+      ctx.fillStyle = moonBodyGrad;
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Moon craters
+      ctx.fillStyle = 'rgba(100, 100, 120, 0.3)';
+      ctx.beginPath();
+      ctx.arc(moonX - 10, moonY - 5, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(moonX + 12, moonY + 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(moonX - 5, moonY + 12, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Stars with twinkling
+      starsRef.current.forEach(star => {
+        const twinkle = Math.sin(time / 300 + star.twinkle) * 0.5 + 0.5;
+        const starSize = star.size * (0.6 + twinkle * 0.4);
+        
+        // Some stars have color variation
+        const colorVariation = Math.sin(star.twinkle) > 0 ? 
+          `rgba(200, 220, 255, ${0.4 + twinkle * 0.6})` : 
+          `rgba(255, 240, 200, ${0.4 + twinkle * 0.6})`;
+        
+        ctx.fillStyle = colorVariation;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, starSize, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // Nebula effect
-      const nebulaGradient = ctx.createRadialGradient(width * 0.7, height * 0.3, 0, width * 0.7, height * 0.3, 200);
-      nebulaGradient.addColorStop(0, 'rgba(138, 43, 226, 0.15)');
-      nebulaGradient.addColorStop(0.5, 'rgba(75, 0, 130, 0.08)');
+      // Nebula effects (multiple smaller ones)
+      const nebulaGradient = ctx.createRadialGradient(width * 0.75, height * 0.25, 0, width * 0.75, height * 0.25, 180);
+      nebulaGradient.addColorStop(0, 'rgba(138, 43, 226, 0.12)');
+      nebulaGradient.addColorStop(0.6, 'rgba(75, 0, 130, 0.06)');
       nebulaGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = nebulaGradient;
       ctx.fillRect(0, 0, width, height);
+      
+      const nebula2 = ctx.createRadialGradient(width * 0.3, height * 0.4, 0, width * 0.3, height * 0.4, 150);
+      nebula2.addColorStop(0, 'rgba(0, 100, 150, 0.1)');
+      nebula2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = nebula2;
+      ctx.fillRect(0, 0, width, height);
+
+      // Parallax mountains/buildings (far layer)
+      const parallaxOffset1 = (time / 80) % (width * 1.5);
+      ctx.fillStyle = 'rgba(15, 8, 30, 0.9)';
+      for (let i = 0; i < 4; i++) {
+        const mx = (i * width / 3 - parallaxOffset1 + width * 2) % (width * 1.5) - width * 0.25;
+        const mh = height * (0.28 + Math.sin(i * 1.5) * 0.08);
+        
+        // Mountain shape
+        ctx.beginPath();
+        ctx.moveTo(mx - 80, height - 80);
+        ctx.lineTo(mx, height - 80 - mh);
+        ctx.lineTo(mx + 80, height - 80);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Parallax mountains (near layer - faster)
+      const parallaxOffset2 = (time / 50) % (width * 1.5);
+      ctx.fillStyle = 'rgba(30, 15, 50, 0.95)';
+      for (let i = 0; i < 5; i++) {
+        const mx = (i * width / 4 - parallaxOffset2 + width * 2) % (width * 1.5) - width * 0.25;
+        const mh = height * (0.18 + Math.sin(i * 2) * 0.06);
+        
+        ctx.beginPath();
+        ctx.moveTo(mx - 60, height - 80);
+        ctx.lineTo(mx - 30, height - 80 - mh * 0.7);
+        ctx.lineTo(mx, height - 80 - mh);
+        ctx.lineTo(mx + 30, height - 80 - mh * 0.6);
+        ctx.lineTo(mx + 60, height - 80);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Background birds
+      bgBirdsRef.current.forEach((bgBird, i) => {
+        const bx = (bgBird.x + time / 1000 * bgBird.speed) % (width + 100) - 50;
+        const by = bgBird.y + Math.sin(time / 500 + bgBird.wingPhase) * 5;
+        const wingY = Math.sin(time / 100 + bgBird.wingPhase) * 4;
+        
+        ctx.fillStyle = 'rgba(20, 10, 30, 0.6)';
+        ctx.beginPath();
+        // Body
+        ctx.ellipse(bx, by, 8, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Wings
+        ctx.beginPath();
+        ctx.moveTo(bx - 3, by);
+        ctx.quadraticCurveTo(bx - 10, by - 8 + wingY, bx - 15, by - 3 + wingY);
+        ctx.lineTo(bx - 3, by);
+        ctx.moveTo(bx + 3, by);
+        ctx.quadraticCurveTo(bx + 10, by - 8 + wingY, bx + 15, by - 3 + wingY);
+        ctx.lineTo(bx + 3, by);
+        ctx.fill();
+      });
+
+      // Meteors (shooting stars)
+      if (Math.random() < 0.003) {
+        meteorsRef.current.push({
+          x: width + 20,
+          y: Math.random() * height * 0.4,
+          speed: 300 + Math.random() * 200,
+          angle: Math.PI * 0.8 + Math.random() * 0.2,
+          length: 40 + Math.random() * 60,
+          life: 1,
+        });
+      }
+      
+      meteorsRef.current = meteorsRef.current.filter(meteor => {
+        meteor.x -= Math.cos(meteor.angle) * meteor.speed * 0.016;
+        meteor.y += Math.sin(meteor.angle) * meteor.speed * 0.016;
+        meteor.life -= 0.015;
+        
+        if (meteor.life > 0 && meteor.x > -100 && meteor.y < height) {
+          const meteorGrad = ctx.createLinearGradient(
+            meteor.x, meteor.y,
+            meteor.x + Math.cos(meteor.angle) * meteor.length,
+            meteor.y - Math.sin(meteor.angle) * meteor.length
+          );
+          meteorGrad.addColorStop(0, `rgba(255, 255, 255, ${meteor.life})`);
+          meteorGrad.addColorStop(0.3, `rgba(255, 200, 100, ${meteor.life * 0.7})`);
+          meteorGrad.addColorStop(1, 'rgba(255, 100, 50, 0)');
+          
+          ctx.strokeStyle = meteorGrad;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(meteor.x, meteor.y);
+          ctx.lineTo(
+            meteor.x + Math.cos(meteor.angle) * meteor.length,
+            meteor.y - Math.sin(meteor.angle) * meteor.length
+          );
+          ctx.stroke();
+          return true;
+        }
+        return false;
+      });
     }
 
     // Lightning (optimized - reduced shadows)
