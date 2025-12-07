@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Bird, Pipe, GameState, GameConfig, DIFFICULTY_CONFIGS, Coin, CoinType, Enemy, Shield, Weapon, Bullet, Bomb, Particle, Lightning, COIN_VALUES, BulletType } from './types';
+import { SHOP_BIRDS, SHOP_WEAPONS } from './shopTypes';
 import { useGameLoop } from './useGameLoop';
 
 const COLORS = {
@@ -26,7 +27,7 @@ const COLORS = {
 interface GameCanvasProps {
   width: number;
   height: number;
-  onGameOver: (score: number) => void;
+  onGameOver: (score: number, coinsCollected?: number, killsCount?: number) => void;
   onScoreUpdate: (score: number) => void;
   gameState: GameState;
   onStart: () => void;
@@ -34,9 +35,11 @@ interface GameCanvasProps {
   onScore?: () => void;
   onWeaponUpgrade?: (level: number) => void;
   onShieldUpgrade?: () => void;
+  selectedBird?: string;
+  selectedWeapon?: string;
 }
 
-export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart, onJump, onScore, onWeaponUpgrade, onShieldUpgrade }: GameCanvasProps) => {
+export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart, onJump, onScore, onWeaponUpgrade, onShieldUpgrade, selectedBird = 'classic', selectedWeapon = 'basic' }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scoreFlash, setScoreFlash] = useState(false);
@@ -74,6 +77,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const wingAngleRef = useRef(0);
   const lastJumpTimeRef = useRef(0);
   const totalCoinsRef = useRef(0);
+  const totalKillsRef = useRef(0);
   const starsRef = useRef<{ x: number; y: number; size: number; twinkle: number }[]>([]);
   const mountainsRef = useRef<{ x: number; height: number; color: string }[]>([]);
   const meteorsRef = useRef<{ x: number; y: number; speed: number; angle: number; length: number; life: number }[]>([]);
@@ -198,6 +202,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     lightningTimerRef.current = 0;
     lastJumpTimeRef.current = 0;
     totalCoinsRef.current = 0;
+    totalKillsRef.current = 0;
   }, [width, height]);
 
   useEffect(() => {
@@ -744,6 +749,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
               } else {
                 createParticles(enemy.x, enemy.y, 15, enemy.type === 'hunter' ? '#FF0000' : '#FF6600', 'explosion');
               }
+              totalKillsRef.current++;
               onScoreUpdate(gameState.score + 2);
               enemiesRef.current.splice(i, 1);
             } else {
@@ -852,7 +858,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         }
       } else {
         createParticles(bird.x, bird.y, 20, '#FFD700', 'explosion');
-        onGameOver(gameState.score);
+        onGameOver(gameState.score, totalCoinsRef.current, totalKillsRef.current);
       }
     }
   }, [gameState.status, gameState.score, gameState.difficulty, spawnPipe, spawnEnemy, spawnAdvancedEnemy, checkCollision, checkEnemyCollision, checkBulletCollision, checkBombCollision, onScoreUpdate, onGameOver, onScore, height, width, createParticles, createLightning]);
@@ -1783,8 +1789,10 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       }
     }
 
-    // Body - EPIC aggressive look when enhanced shield
+    // Body - EPIC aggressive look when enhanced shield, or custom bird colors
     const isEnhancedShield = bird.hasShield && bird.shieldLevel === 2;
+    const selectedBirdData = SHOP_BIRDS.find(b => b.id === selectedBird) || SHOP_BIRDS[0];
+    const birdColors = selectedBirdData.colors;
     const bg = ctx.createRadialGradient(-3, -5, 2, 0, 0, bird.width / 2);
     
     if (isEnhancedShield) {
@@ -1799,28 +1807,29 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       ctx.shadowColor = '#FF4500';
       ctx.shadowBlur = 15;
     } else {
-      bg.addColorStop(0, '#FFF176');
-      bg.addColorStop(0.5, '#FFD700');
-      bg.addColorStop(1, '#FFA000');
+      // Use selected bird colors
+      bg.addColorStop(0, birdColors.bodyHighlight);
+      bg.addColorStop(0.5, birdColors.body);
+      bg.addColorStop(1, birdColors.wing);
     }
     
     ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = isEnhancedShield ? '#FF0000' : '#E65100';
+    ctx.strokeStyle = isEnhancedShield ? '#FF0000' : birdColors.wingHighlight;
     ctx.lineWidth = isEnhancedShield ? 3 : 2;
     ctx.stroke();
     
     ctx.shadowBlur = 0;
 
-    // Wing - fiery when enhanced
+    // Wing - fiery when enhanced, or custom colors
     const wy = Math.sin(wingAngleRef.current) * 7;
-    ctx.fillStyle = isEnhancedShield ? '#FF6600' : '#FFA500';
+    ctx.fillStyle = isEnhancedShield ? '#FF6600' : birdColors.wing;
     ctx.beginPath();
     ctx.ellipse(-5, wy, 13, 9, -0.3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = isEnhancedShield ? '#8B0000' : '#BF360C';
+    ctx.strokeStyle = isEnhancedShield ? '#8B0000' : birdColors.wingHighlight;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 

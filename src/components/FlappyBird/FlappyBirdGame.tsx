@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { GameCanvas } from './GameCanvas';
 import { GameUI } from './GameUI';
 import { DifficultyMenu } from './DifficultyMenu';
+import { Shop } from './Shop';
 import { GameState, Difficulty } from './types';
+import { PlayerProgress, loadProgress, saveProgress, SHOP_BIRDS, SHOP_WEAPONS } from './shopTypes';
 import { useGameAudio } from '@/hooks/useGameAudio';
 
 const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
@@ -20,6 +22,8 @@ const getStorageKey = (difficulty: Difficulty) => {
 export const FlappyBirdGame = () => {
   const [dimensions, setDimensions] = useState({ width: 400, height: 600 });
   const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0, crazy: 0 });
+  const [showShop, setShowShop] = useState(false);
+  const [progress, setProgress] = useState<PlayerProgress>(loadProgress);
   const [gameState, setGameState] = useState<GameState>({
     status: 'menu',
     score: 0,
@@ -88,9 +92,24 @@ export const FlappyBirdGame = () => {
     setGameState(prev => ({ ...prev, score }));
   }, []);
 
-  const handleGameOver = useCallback((finalScore: number) => {
+  const handleGameOver = useCallback((finalScore: number, coinsCollected: number = 0, killsCount: number = 0) => {
     audio.stopMusic();
     audio.playGameOver();
+    
+    // Update progress for crazy mode
+    if (gameState.difficulty === 'crazy') {
+      setProgress(prev => {
+        const updated = {
+          ...prev,
+          totalCoins: prev.totalCoins + coinsCollected,
+          totalKills: prev.totalKills + killsCount,
+          highestScore: Math.max(prev.highestScore, finalScore),
+        };
+        saveProgress(updated);
+        return updated;
+      });
+    }
+    
     setGameState(prev => {
       const storageKey = getStorageKey(prev.difficulty);
       const currentHigh = highScores[prev.difficulty];
@@ -108,7 +127,37 @@ export const FlappyBirdGame = () => {
         highScore: newHighScore,
       };
     });
-  }, [highScores, audio]);
+  }, [highScores, audio, gameState.difficulty]);
+
+  const handlePurchase = useCallback((type: 'bird' | 'weapon', id: string, price: number): boolean => {
+    if (progress.totalCoins < price) return false;
+    
+    setProgress(prev => {
+      const updated = {
+        ...prev,
+        totalCoins: prev.totalCoins - price,
+        purchasedBirds: type === 'bird' ? [...prev.purchasedBirds, id] : prev.purchasedBirds,
+        purchasedWeapons: type === 'weapon' ? [...prev.purchasedWeapons, id] : prev.purchasedWeapons,
+        selectedBird: type === 'bird' ? id : prev.selectedBird,
+        selectedWeapon: type === 'weapon' ? id : prev.selectedWeapon,
+      };
+      saveProgress(updated);
+      return updated;
+    });
+    return true;
+  }, [progress.totalCoins]);
+
+  const handleSelectItem = useCallback((type: 'bird' | 'weapon', id: string) => {
+    setProgress(prev => {
+      const updated = {
+        ...prev,
+        selectedBird: type === 'bird' ? id : prev.selectedBird,
+        selectedWeapon: type === 'weapon' ? id : prev.selectedWeapon,
+      };
+      saveProgress(updated);
+      return updated;
+    });
+  }, []);
 
   const handleRestart = useCallback(() => {
     setGameState(prev => ({
@@ -137,7 +186,14 @@ export const FlappyBirdGame = () => {
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
         }}
       >
-        {gameState.status === 'menu' ? (
+        {showShop ? (
+          <Shop
+            progress={progress}
+            onPurchase={handlePurchase}
+            onSelect={handleSelectItem}
+            onClose={() => setShowShop(false)}
+          />
+        ) : gameState.status === 'menu' ? (
           <div 
             className="absolute inset-0"
             style={{ background: 'var(--gradient-sky)' }}
@@ -149,6 +205,8 @@ export const FlappyBirdGame = () => {
               onToggleSound={audio.toggleSound}
               onToggleMusic={audio.toggleMusic}
               onUpdateAudioSettings={audio.updateSettings}
+              onOpenShop={() => setShowShop(true)}
+              crazyCoins={progress.totalCoins}
             />
           </div>
         ) : (
@@ -164,6 +222,8 @@ export const FlappyBirdGame = () => {
               onScore={audio.playScore}
               onWeaponUpgrade={audio.playWeaponUpgrade}
               onShieldUpgrade={audio.playShieldUpgrade}
+              selectedBird={progress.selectedBird}
+              selectedWeapon={progress.selectedWeapon}
             />
             <GameUI
               gameState={gameState}
