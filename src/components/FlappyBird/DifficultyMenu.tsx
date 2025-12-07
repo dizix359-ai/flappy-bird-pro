@@ -17,6 +17,8 @@ interface DifficultyMenuProps {
   onToggleSound: () => void;
   onToggleMusic: () => void;
   onUpdateAudioSettings: (settings: Partial<AudioSettings>) => void;
+  onOpenShop?: () => void;
+  crazyCoins?: number;
 }
 
 export const DifficultyMenu = ({ 
@@ -26,6 +28,8 @@ export const DifficultyMenu = ({
   onToggleSound,
   onToggleMusic,
   onUpdateAudioSettings,
+  onOpenShop,
+  crazyCoins = 0,
 }: DifficultyMenuProps) => {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-5 px-6 relative">
@@ -125,6 +129,20 @@ export const DifficultyMenu = ({
           </div>
         </button>
       </div>
+
+      {/* Shop Button for Crazy Mode */}
+      {onOpenShop && (
+        <button
+          onClick={onOpenShop}
+          className="mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:scale-105"
+        >
+          <span className="text-lg">🛒</span>
+          <span>المتجر</span>
+          <span className="bg-yellow-500/30 px-2 py-0.5 rounded-full text-yellow-300 text-sm">
+            💰 {crazyCoins}
+          </span>
+        </button>
+      )}
 
       <p className="text-xs text-white/70 mt-2 text-center" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.4)' }}>
         تجنب الأنابيب واجمع أكبر عدد من النقاط!
