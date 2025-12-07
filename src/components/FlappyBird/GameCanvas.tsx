@@ -32,9 +32,11 @@ interface GameCanvasProps {
   onStart: () => void;
   onJump?: () => void;
   onScore?: () => void;
+  onWeaponUpgrade?: (level: number) => void;
+  onShieldUpgrade?: () => void;
 }
 
-export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart, onJump, onScore }: GameCanvasProps) => {
+export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState, onStart, onJump, onScore, onWeaponUpgrade, onShieldUpgrade }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scoreFlash, setScoreFlash] = useState(false);
@@ -604,6 +606,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
             bird.shieldLevel = 2;
             bird.shieldHits = 3;
             createParticles(shield.x, shield.y, 15, '#00FFFF', 'star');
+            onShieldUpgrade?.();
           } else {
             // First shield pickup
             bird.hasShield = true;
@@ -633,11 +636,16 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           // Weapon upgrade system
           if (bird.hasWeapon) {
             // Upgrade weapon level
-            bird.weaponLevel = Math.min((bird.weaponLevel || 1) + 1, 3) as 1 | 2 | 3;
+            const newLevel = Math.min((bird.weaponLevel || 1) + 1, 3) as 1 | 2 | 3;
+            bird.weaponLevel = newLevel;
             bird.weaponAmmo = (bird.weaponAmmo || 0) + weapon.ammo;
             
             const upgradeColor = bird.weaponLevel === 3 ? '#FF4500' : bird.weaponLevel === 2 ? '#00FFFF' : '#FF6600';
             createParticles(weapon.x, weapon.y, 12, upgradeColor, bird.weaponLevel === 3 ? 'explosion' : 'spark');
+            
+            if (newLevel >= 2) {
+              onWeaponUpgrade?.(newLevel);
+            }
           } else {
             // First weapon pickup
             bird.hasWeapon = true;

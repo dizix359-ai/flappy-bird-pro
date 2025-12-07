@@ -162,6 +162,8 @@ export const FlappyBirdGame = () => {
               onGameOver={handleGameOver}
               onJump={audio.playJump}
               onScore={audio.playScore}
+              onWeaponUpgrade={audio.playWeaponUpgrade}
+              onShieldUpgrade={audio.playShieldUpgrade}
             />
             <GameUI
               gameState={gameState}

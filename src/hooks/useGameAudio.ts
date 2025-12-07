@@ -159,6 +159,144 @@ export const useGameAudio = () => {
     }
   }, [settings.soundEnabled, settings.soundVolume, getAudioContext]);
 
+  // Weapon upgrade sound - powerful electric/fire effect
+  const playWeaponUpgrade = useCallback((level: number) => {
+    if (!settings.soundEnabled) return;
+
+    try {
+      const ctx = getAudioContext();
+      if (ctx.state === 'suspended') ctx.resume();
+
+      if (level === 2) {
+        // Lightning upgrade - electric zap sound
+        const frequencies = [800, 1200, 1600, 2000, 1400, 1800];
+        frequencies.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.03);
+          osc.frequency.exponentialRampToValueAtTime(freq * 1.5, ctx.currentTime + i * 0.03 + 0.05);
+          
+          const volume = 0.25 * settings.soundVolume;
+          gain.gain.setValueAtTime(volume, ctx.currentTime + i * 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.03 + 0.1);
+          
+          osc.start(ctx.currentTime + i * 0.03);
+          osc.stop(ctx.currentTime + i * 0.03 + 0.1);
+        });
+      } else if (level === 3) {
+        // Fire upgrade - deep roaring flame sound
+        const baseFreqs = [150, 200, 180, 220, 250, 300, 350, 400];
+        baseFreqs.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.05);
+          osc.frequency.exponentialRampToValueAtTime(freq * 2, ctx.currentTime + i * 0.05 + 0.1);
+          
+          const volume = 0.3 * settings.soundVolume;
+          gain.gain.setValueAtTime(volume, ctx.currentTime + i * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.05 + 0.15);
+          
+          osc.start(ctx.currentTime + i * 0.05);
+          osc.stop(ctx.currentTime + i * 0.05 + 0.15);
+        });
+        
+        // Add high frequency crackle
+        for (let i = 0; i < 10; i++) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(800 + Math.random() * 1200, ctx.currentTime + i * 0.04);
+          
+          const volume = 0.15 * settings.soundVolume;
+          gain.gain.setValueAtTime(volume, ctx.currentTime + i * 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.04 + 0.05);
+          
+          osc.start(ctx.currentTime + i * 0.04);
+          osc.stop(ctx.currentTime + i * 0.04 + 0.05);
+        }
+      }
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }, [settings.soundEnabled, settings.soundVolume, getAudioContext]);
+
+  // Shield upgrade sound - powerful transformation effect
+  const playShieldUpgrade = useCallback(() => {
+    if (!settings.soundEnabled) return;
+
+    try {
+      const ctx = getAudioContext();
+      if (ctx.state === 'suspended') ctx.resume();
+
+      // Epic power-up rising tone
+      const notes = [200, 300, 400, 500, 600, 800, 1000, 1200];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.06);
+        
+        const volume = 0.3 * settings.soundVolume;
+        gain.gain.setValueAtTime(volume, ctx.currentTime + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.06 + 0.12);
+        
+        osc.start(ctx.currentTime + i * 0.06);
+        osc.stop(ctx.currentTime + i * 0.06 + 0.12);
+      });
+
+      // Add power chord
+      const chordFreqs = [400, 500, 600];
+      chordFreqs.forEach((freq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + 0.5);
+        
+        const volume = 0.25 * settings.soundVolume;
+        gain.gain.setValueAtTime(volume, ctx.currentTime + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+        
+        osc.start(ctx.currentTime + 0.5);
+        osc.stop(ctx.currentTime + 0.8);
+      });
+
+      // Epic finish
+      const finishOsc = ctx.createOscillator();
+      const finishGain = ctx.createGain();
+      finishOsc.connect(finishGain);
+      finishGain.connect(ctx.destination);
+      
+      finishOsc.type = 'sine';
+      finishOsc.frequency.setValueAtTime(1400, ctx.currentTime + 0.7);
+      
+      const finishVolume = 0.35 * settings.soundVolume;
+      finishGain.gain.setValueAtTime(finishVolume, ctx.currentTime + 0.7);
+      finishGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
+      
+      finishOsc.start(ctx.currentTime + 0.7);
+      finishOsc.stop(ctx.currentTime + 1.2);
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }, [settings.soundEnabled, settings.soundVolume, getAudioContext]);
+
   // Background music - simple looping melody
   const startMusic = useCallback(() => {
     if (!settings.musicEnabled || isMusicPlayingRef.current) return;
@@ -263,6 +401,8 @@ export const useGameAudio = () => {
     playJump,
     playScore,
     playGameOver,
+    playWeaponUpgrade,
+    playShieldUpgrade,
     startMusic,
     stopMusic,
   };
