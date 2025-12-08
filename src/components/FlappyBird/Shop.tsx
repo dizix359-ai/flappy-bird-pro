@@ -24,10 +24,22 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
     const { type, value } = item.unlockRequirement;
     switch (type) {
       case 'score': return progress.highestScore >= value;
-      case 'coins': return progress.totalCoins >= value;
+      case 'coins': return progress.totalCoins >= value; // Total coins earned, not current
       case 'kills': return progress.totalKills >= value;
       default: return true;
     }
+  };
+
+  const getUnlockProgress = (item: ShopBird | ShopWeapon): { current: number; required: number; percent: number } | null => {
+    if (!item.unlockRequirement) return null;
+    const { type, value } = item.unlockRequirement;
+    let current = 0;
+    switch (type) {
+      case 'score': current = progress.highestScore; break;
+      case 'coins': current = progress.totalCoins; break;
+      case 'kills': current = progress.totalKills; break;
+    }
+    return { current, required: value, percent: Math.min(100, (current / value) * 100) };
   };
 
   const isPurchased = (type: 'bird' | 'weapon', id: string): boolean => {
@@ -169,6 +181,7 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
               const unlocked = isUnlocked(bird);
               const purchased = isPurchased('bird', bird.id);
               const selected = isSelected('bird', bird.id);
+              const unlockProgress = getUnlockProgress(bird);
               
               return (
                 <div
@@ -179,12 +192,24 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
                       ? 'bg-gradient-to-br from-green-500/40 to-emerald-600/40 ring-2 ring-green-400'
                       : unlocked
                         ? 'bg-white/10 hover:bg-white/20'
-                        : 'bg-black/30 opacity-60'
+                        : 'bg-black/30 opacity-80'
                   }`}
                 >
-                  {!unlocked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                      <span className="text-2xl">🔒</span>
+                  {!unlocked && unlockProgress && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl p-2">
+                      <span className="text-2xl mb-1">🔒</span>
+                      <div className="w-full px-2">
+                        <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all"
+                            style={{ width: `${unlockProgress.percent}%` }}
+                          />
+                        </div>
+                        <p className="text-[9px] text-white/70 text-center mt-1">
+                          {bird.unlockRequirement?.type === 'score' ? '🏆' : bird.unlockRequirement?.type === 'kills' ? '💀' : '💰'}
+                          {' '}{unlockProgress.current}/{unlockProgress.required}
+                        </p>
+                      </div>
                     </div>
                   )}
                   
@@ -201,9 +226,13 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
                         <span className="text-green-400 text-xs font-bold">✓ مُختار</span>
                       ) : purchased ? (
                         <span className="text-blue-300 text-xs">اختيار</span>
-                      ) : (
+                      ) : unlocked ? (
                         <span className="text-yellow-400 text-xs font-bold">
-                          {bird.price === 0 ? 'مجاني' : `💰 ${bird.price}`}
+                          {bird.price === 0 ? 'مجاني' : `💰 ${bird.price.toLocaleString()}`}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs font-bold">
+                          💰 {bird.price.toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -216,6 +245,7 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
               const unlocked = isUnlocked(weapon);
               const purchased = isPurchased('weapon', weapon.id);
               const selected = isSelected('weapon', weapon.id);
+              const unlockProgress = getUnlockProgress(weapon);
               
               return (
                 <div
@@ -226,12 +256,24 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
                       ? 'bg-gradient-to-br from-green-500/40 to-emerald-600/40 ring-2 ring-green-400'
                       : unlocked
                         ? 'bg-white/10 hover:bg-white/20'
-                        : 'bg-black/30 opacity-60'
+                        : 'bg-black/30 opacity-80'
                   }`}
                 >
-                  {!unlocked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                      <span className="text-2xl">🔒</span>
+                  {!unlocked && unlockProgress && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl p-2">
+                      <span className="text-2xl mb-1">🔒</span>
+                      <div className="w-full px-2">
+                        <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all"
+                            style={{ width: `${unlockProgress.percent}%` }}
+                          />
+                        </div>
+                        <p className="text-[9px] text-white/70 text-center mt-1">
+                          {weapon.unlockRequirement?.type === 'score' ? '🏆' : weapon.unlockRequirement?.type === 'kills' ? '💀' : '💰'}
+                          {' '}{unlockProgress.current}/{unlockProgress.required}
+                        </p>
+                      </div>
                     </div>
                   )}
                   
@@ -253,9 +295,13 @@ export const Shop = ({ progress, onPurchase, onSelect, onClose }: ShopProps) => 
                         <span className="text-green-400 text-xs font-bold">✓ مُختار</span>
                       ) : purchased ? (
                         <span className="text-blue-300 text-xs">اختيار</span>
-                      ) : (
+                      ) : unlocked ? (
                         <span className="text-yellow-400 text-xs font-bold">
-                          {weapon.price === 0 ? 'مجاني' : `💰 ${weapon.price}`}
+                          {weapon.price === 0 ? 'مجاني' : `💰 ${weapon.price.toLocaleString()}`}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs font-bold">
+                          💰 {weapon.price.toLocaleString()}
                         </span>
                       )}
                     </div>
