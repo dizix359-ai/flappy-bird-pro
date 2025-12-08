@@ -18,6 +18,7 @@ interface DifficultyMenuProps {
   onToggleMusic: () => void;
   onUpdateAudioSettings: (settings: Partial<AudioSettings>) => void;
   onOpenShop?: () => void;
+  onOpenLeaderboard?: () => void;
   crazyCoins?: number;
 }
 
@@ -29,6 +30,7 @@ export const DifficultyMenu = ({
   onToggleMusic,
   onUpdateAudioSettings,
   onOpenShop,
+  onOpenLeaderboard,
   crazyCoins = 0,
 }: DifficultyMenuProps) => {
   return (
@@ -130,19 +132,33 @@ export const DifficultyMenu = ({
         </button>
       </div>
 
-      {/* Shop Button for Crazy Mode */}
-      {onOpenShop && (
-        <button
-          onClick={onOpenShop}
-          className="mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:scale-105"
-        >
-          <span className="text-lg">🛒</span>
-          <span>المتجر</span>
-          <span className="bg-yellow-500/30 px-2 py-0.5 rounded-full text-yellow-300 text-sm">
-            💰 {crazyCoins}
-          </span>
-        </button>
-      )}
+      {/* Buttons Row */}
+      <div className="flex gap-3 mt-3">
+        {/* Shop Button */}
+        {onOpenShop && (
+          <button
+            onClick={onOpenShop}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:scale-105"
+          >
+            <span className="text-lg">🛒</span>
+            <span>المتجر</span>
+            <span className="bg-yellow-500/30 px-2 py-0.5 rounded-full text-yellow-300 text-sm">
+              💰 {crazyCoins}
+            </span>
+          </button>
+        )}
+
+        {/* Leaderboard Button */}
+        {onOpenLeaderboard && (
+          <button
+            onClick={onOpenLeaderboard}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all shadow-lg hover:scale-105"
+          >
+            <span className="text-lg">🏆</span>
+            <span>المتصدرين</span>
+          </button>
+        )}
+      </div>
 
       <p className="text-xs text-white/70 mt-2 text-center" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.4)' }}>
         تجنب الأنابيب واجمع أكبر عدد من النقاط!
