@@ -3,6 +3,8 @@ import { GameCanvas } from './GameCanvas';
 import { GameUI } from './GameUI';
 import { DifficultyMenu } from './DifficultyMenu';
 import { Shop } from './Shop';
+import { Leaderboard } from './Leaderboard';
+import { HighScoreNameInput } from './HighScoreNameInput';
 import { GameState, Difficulty } from './types';
 import { PlayerProgress, loadProgress, saveProgress, SHOP_BIRDS, SHOP_WEAPONS } from './shopTypes';
 import { 
@@ -14,6 +16,7 @@ import {
   ACHIEVEMENTS
 } from './achievementsTypes';
 import { useGameAudio } from '@/hooks/useGameAudio';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
 
 const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
 const STORAGE_KEY_HARD = 'flappy-bird-high-score-hard';
@@ -31,6 +34,9 @@ export const FlappyBirdGame = () => {
   const [dimensions, setDimensions] = useState({ width: 400, height: 600 });
   const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0, crazy: 0 });
   const [showShop, setShowShop] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [pendingScore, setPendingScore] = useState<{ score: number; difficulty: Difficulty } | null>(null);
   const [progress, setProgress] = useState<PlayerProgress>(loadProgress);
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress>(loadAchievementProgress);
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
@@ -42,6 +48,7 @@ export const FlappyBirdGame = () => {
   });
 
   const audio = useGameAudio();
+  const { checkIfQualifies, submitScore } = useLeaderboard();
 
   useEffect(() => {
     const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
@@ -102,9 +109,11 @@ export const FlappyBirdGame = () => {
     setGameState(prev => ({ ...prev, score }));
   }, []);
 
-  const handleGameOver = useCallback((finalScore: number, coinsCollected: number = 0, killsCount: number = 0) => {
+  const handleGameOver = useCallback(async (finalScore: number, coinsCollected: number = 0, killsCount: number = 0) => {
     audio.stopMusic();
     audio.playGameOver();
+    
+    const currentDifficulty = gameState.difficulty;
     
     // Update progress for all modes
     setProgress(prev => {
@@ -120,7 +129,7 @@ export const FlappyBirdGame = () => {
     
     // Update achievement progress
     setAchievementProgress(prev => {
-      const scoreKey = `${gameState.difficulty}HighScore` as 'easyHighScore' | 'hardHighScore' | 'crazyHighScore';
+      const scoreKey = `${currentDifficulty}HighScore` as 'easyHighScore' | 'hardHighScore' | 'crazyHighScore';
       const updated: AchievementProgress = {
         ...prev,
         gamesPlayed: prev.gamesPlayed + 1,
@@ -130,7 +139,7 @@ export const FlappyBirdGame = () => {
       };
       
       // Check for new achievements
-      const { newlyUnlocked, totalReward } = checkAchievements(updated, gameState.difficulty);
+      const { newlyUnlocked, totalReward } = checkAchievements(updated, currentDifficulty);
       
       if (newlyUnlocked.length > 0) {
         updated.unlockedAchievements = [
@@ -156,24 +165,45 @@ export const FlappyBirdGame = () => {
       return updated;
     });
     
-    setGameState(prev => {
-      const storageKey = getStorageKey(prev.difficulty);
-      const currentHigh = highScores[prev.difficulty];
-      const newHighScore = Math.max(currentHigh, finalScore);
-      
-      if (newHighScore > currentHigh) {
-        localStorage.setItem(storageKey, newHighScore.toString());
-        setHighScores(h => ({ ...h, [prev.difficulty]: newHighScore }));
+    const storageKey = getStorageKey(currentDifficulty);
+    const currentHigh = highScores[currentDifficulty];
+    const newHighScore = Math.max(currentHigh, finalScore);
+    const isNewLocalHighScore = finalScore > currentHigh;
+    
+    if (isNewLocalHighScore) {
+      localStorage.setItem(storageKey, newHighScore.toString());
+      setHighScores(h => ({ ...h, [currentDifficulty]: newHighScore }));
+    }
+    
+    setGameState(prev => ({
+      ...prev,
+      status: 'gameOver',
+      score: finalScore,
+      highScore: newHighScore,
+    }));
+    
+    // Check if qualifies for leaderboard
+    if (finalScore > 0) {
+      const qualifies = await checkIfQualifies(finalScore, currentDifficulty);
+      if (qualifies) {
+        setPendingScore({ score: finalScore, difficulty: currentDifficulty });
+        setShowNameInput(true);
       }
-      
-      return {
-        ...prev,
-        status: 'gameOver',
-        score: finalScore,
-        highScore: newHighScore,
-      };
-    });
-  }, [highScores, audio, gameState.difficulty]);
+    }
+  }, [highScores, audio, gameState.difficulty, checkIfQualifies]);
+
+  const handleNameSubmit = useCallback(async (name: string) => {
+    if (pendingScore) {
+      await submitScore(name, pendingScore.score, pendingScore.difficulty);
+    }
+    setShowNameInput(false);
+    setPendingScore(null);
+  }, [pendingScore, submitScore]);
+
+  const handleNameSkip = useCallback(() => {
+    setShowNameInput(false);
+    setPendingScore(null);
+  }, []);
 
   const handlePurchase = useCallback((type: 'bird' | 'weapon', id: string, price: number): boolean => {
     if (progress.totalCoins < price) return false;
@@ -224,6 +254,16 @@ export const FlappyBirdGame = () => {
 
   return (
     <div className="game-container">
+      {/* High Score Name Input Modal */}
+      {showNameInput && pendingScore && (
+        <HighScoreNameInput
+          score={pendingScore.score}
+          difficulty={pendingScore.difficulty}
+          onSubmit={handleNameSubmit}
+          onSkip={handleNameSkip}
+        />
+      )}
+      
       {/* Achievement Notification */}
       {newAchievements.length > 0 && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2">
@@ -252,7 +292,9 @@ export const FlappyBirdGame = () => {
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
         }}
       >
-        {showShop ? (
+        {showLeaderboard ? (
+          <Leaderboard onClose={() => setShowLeaderboard(false)} />
+        ) : showShop ? (
           <Shop
             progress={progress}
             onPurchase={handlePurchase}
@@ -272,6 +314,7 @@ export const FlappyBirdGame = () => {
               onToggleMusic={audio.toggleMusic}
               onUpdateAudioSettings={audio.updateSettings}
               onOpenShop={() => setShowShop(true)}
+              onOpenLeaderboard={() => setShowLeaderboard(true)}
               crazyCoins={progress.totalCoins}
             />
           </div>
