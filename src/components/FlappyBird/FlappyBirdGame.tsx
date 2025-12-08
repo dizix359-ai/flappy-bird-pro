@@ -5,6 +5,14 @@ import { DifficultyMenu } from './DifficultyMenu';
 import { Shop } from './Shop';
 import { GameState, Difficulty } from './types';
 import { PlayerProgress, loadProgress, saveProgress, SHOP_BIRDS, SHOP_WEAPONS } from './shopTypes';
+import { 
+  AchievementProgress, 
+  loadAchievementProgress, 
+  saveAchievementProgress, 
+  checkAchievements,
+  Achievement,
+  ACHIEVEMENTS
+} from './achievementsTypes';
 import { useGameAudio } from '@/hooks/useGameAudio';
 
 const STORAGE_KEY_EASY = 'flappy-bird-high-score-easy';
@@ -24,6 +32,8 @@ export const FlappyBirdGame = () => {
   const [highScores, setHighScores] = useState<Record<Difficulty, number>>({ easy: 0, hard: 0, crazy: 0 });
   const [showShop, setShowShop] = useState(false);
   const [progress, setProgress] = useState<PlayerProgress>(loadProgress);
+  const [achievementProgress, setAchievementProgress] = useState<AchievementProgress>(loadAchievementProgress);
+  const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
   const [gameState, setGameState] = useState<GameState>({
     status: 'menu',
     score: 0,
@@ -96,19 +106,55 @@ export const FlappyBirdGame = () => {
     audio.stopMusic();
     audio.playGameOver();
     
-    // Update progress for crazy mode
-    if (gameState.difficulty === 'crazy') {
-      setProgress(prev => {
-        const updated = {
-          ...prev,
-          totalCoins: prev.totalCoins + coinsCollected,
-          totalKills: prev.totalKills + killsCount,
-          highestScore: Math.max(prev.highestScore, finalScore),
-        };
-        saveProgress(updated);
-        return updated;
-      });
-    }
+    // Update progress for all modes
+    setProgress(prev => {
+      const updated = {
+        ...prev,
+        totalCoins: prev.totalCoins + coinsCollected,
+        totalKills: prev.totalKills + killsCount,
+        highestScore: Math.max(prev.highestScore, finalScore),
+      };
+      saveProgress(updated);
+      return updated;
+    });
+    
+    // Update achievement progress
+    setAchievementProgress(prev => {
+      const scoreKey = `${gameState.difficulty}HighScore` as 'easyHighScore' | 'hardHighScore' | 'crazyHighScore';
+      const updated: AchievementProgress = {
+        ...prev,
+        gamesPlayed: prev.gamesPlayed + 1,
+        [scoreKey]: Math.max(prev[scoreKey], finalScore),
+        totalCoinsEarned: prev.totalCoinsEarned + coinsCollected,
+        totalKills: prev.totalKills + killsCount,
+      };
+      
+      // Check for new achievements
+      const { newlyUnlocked, totalReward } = checkAchievements(updated, gameState.difficulty);
+      
+      if (newlyUnlocked.length > 0) {
+        updated.unlockedAchievements = [
+          ...updated.unlockedAchievements,
+          ...newlyUnlocked.map(a => a.id)
+        ];
+        
+        // Add reward coins
+        if (totalReward > 0) {
+          setProgress(p => {
+            const withReward = { ...p, totalCoins: p.totalCoins + totalReward };
+            saveProgress(withReward);
+            return withReward;
+          });
+        }
+        
+        // Show achievements
+        setNewAchievements(newlyUnlocked);
+        setTimeout(() => setNewAchievements([]), 4000);
+      }
+      
+      saveAchievementProgress(updated);
+      return updated;
+    });
     
     setGameState(prev => {
       const storageKey = getStorageKey(prev.difficulty);
@@ -178,6 +224,26 @@ export const FlappyBirdGame = () => {
 
   return (
     <div className="game-container">
+      {/* Achievement Notification */}
+      {newAchievements.length > 0 && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2">
+          {newAchievements.map((achievement, i) => (
+            <div
+              key={achievement.id}
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-2 rounded-lg shadow-lg animate-fade-in"
+              style={{ animationDelay: `${i * 200}ms` }}
+            >
+              <div className="flex items-center gap-2 text-white">
+                <span className="text-2xl">{achievement.icon}</span>
+                <div>
+                  <p className="font-bold text-sm">{achievement.nameAr}</p>
+                  <p className="text-xs opacity-90">+{achievement.reward.value} 💰</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div 
         className="relative rounded-2xl overflow-hidden"
         style={{ 

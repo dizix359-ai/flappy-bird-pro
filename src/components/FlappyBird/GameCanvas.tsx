@@ -85,6 +85,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
   const planetsRef = useRef<{ x: number; y: number; radius: number; color: string; ringColor?: string }[]>([]);
 
   const isCrazyMode = gameState.difficulty === 'crazy';
+  const hasExtendedFeatures = gameState.difficulty !== 'easy' || configRef.current.hasEnemies;
 
   // Initialize environment elements
   useEffect(() => {
@@ -335,8 +336,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     const config = configRef.current;
     if (!config.hasEnemies) return;
 
-    const enemyType: 'hunter' | 'plane' = Math.random() > 0.5 ? 'plane' : 'hunter';
+    // Only spawn hunters in easy/hard mode, hunters + planes in crazy
+    const isCrazy = gameState.difficulty === 'crazy';
+    const enemyType: 'hunter' | 'plane' = isCrazy && Math.random() > 0.5 ? 'plane' : 'hunter';
     const enemyY = 80 + Math.random() * (height - config.groundHeight - 200);
+    
+    const speedMultiplier = config.hunterSpeedMultiplier || 1.0;
+    const shotInterval = config.hunterShotInterval || 1200;
 
     if (enemyType === 'hunter') {
       enemiesRef.current.push({
@@ -345,12 +351,12 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         type: 'hunter',
         width: 50,
         height: 45,
-        velocityX: -80 - Math.random() * 40,
+        velocityX: (-80 - Math.random() * 40) * speedMultiplier,
         velocityY: 0,
         rotation: 0,
-        health: 3,
+        health: isCrazy ? 3 : 2, // Less health in easy/hard
         lastShot: 0,
-        shotInterval: 1200 + Math.random() * 800,
+        shotInterval: shotInterval + Math.random() * 800,
       });
     } else {
       enemiesRef.current.push({
@@ -367,7 +373,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         shotInterval: 1500 + Math.random() * 1000,
       });
     }
-  }, [width, height]);
+  }, [width, height, gameState.difficulty]);
 
   const checkCollision = useCallback((bird: Bird, pipes: Pipe[]): boolean => {
     const config = configRef.current;
