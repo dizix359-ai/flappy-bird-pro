@@ -316,6 +316,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         velocityY: (Math.random() - 0.5) * 60,
         rotation: 0,
         health: 1,
+        spawnTime: performance.now(),
       });
     } else {
       enemiesRef.current.push({
@@ -328,6 +329,7 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         velocityY: 0,
         rotation: 0,
         health: 1,
+        spawnTime: performance.now(),
       });
     }
   }, [width, height]);
@@ -689,7 +691,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         }
         enemy.rotation = Math.atan2(enemy.velocityY, enemy.velocityX) * 180 / Math.PI;
       } else if (enemy.type === 'bird') {
-        enemy.y += Math.sin(performance.now() / 200 + enemy.x) * 30 * dt;
+        // Use spawnTime for consistent wave motion instead of changing x
+        const wavePhase = enemy.spawnTime || 0;
+        enemy.y += Math.sin((now - wavePhase) / 300) * 50 * dt;
       } else if (enemy.type === 'hunter') {
         // Hunter hovers and shoots
         enemy.y += Math.sin(now / 500 + enemy.x * 0.01) * 20 * dt;
