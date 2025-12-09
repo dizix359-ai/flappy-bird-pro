@@ -676,10 +676,17 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       enemy.x += enemy.velocityX * dt;
       enemy.y += enemy.velocityY * dt;
       
-      // Missiles track player slightly
+      // Missiles track player with proper speed
       if (enemy.type === 'missile') {
+        const dx = bird.x - enemy.x;
         const dy = bird.y - enemy.y;
-        enemy.velocityY = dy * 0.5;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const trackingSpeed = 280; // Total tracking speed
+        
+        if (distance > 0) {
+          enemy.velocityX = (dx / distance) * trackingSpeed * -0.3 - 250; // Maintain forward movement
+          enemy.velocityY = (dy / distance) * trackingSpeed * 0.8; // Strong vertical tracking
+        }
         enemy.rotation = Math.atan2(enemy.velocityY, enemy.velocityX) * 180 / Math.PI;
       } else if (enemy.type === 'bird') {
         enemy.y += Math.sin(performance.now() / 200 + enemy.x) * 30 * dt;
