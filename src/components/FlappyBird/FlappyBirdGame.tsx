@@ -48,7 +48,7 @@ export const FlappyBirdGame = () => {
   });
 
   const audio = useGameAudio();
-  const { checkIfQualifies, submitScore } = useLeaderboard();
+  const { checkIfQualifies, needsNameInput, submitScore } = useLeaderboard();
 
   useEffect(() => {
     const easyScore = parseInt(localStorage.getItem(STORAGE_KEY_EASY) || '0', 10);
@@ -186,11 +186,15 @@ export const FlappyBirdGame = () => {
     if (finalScore > 0) {
       const qualifies = await checkIfQualifies(finalScore, currentDifficulty);
       if (qualifies) {
-        setPendingScore({ score: finalScore, difficulty: currentDifficulty });
-        setShowNameInput(true);
+        // Check if player already has a name saved
+        const needsInput = await needsNameInput(finalScore, currentDifficulty);
+        if (needsInput) {
+          setPendingScore({ score: finalScore, difficulty: currentDifficulty });
+          setShowNameInput(true);
+        }
       }
     }
-  }, [highScores, audio, gameState.difficulty, checkIfQualifies]);
+  }, [highScores, audio, gameState.difficulty, checkIfQualifies, needsNameInput]);
 
   const handleNameSubmit = useCallback(async (name: string) => {
     if (pendingScore) {
