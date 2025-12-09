@@ -51,6 +51,7 @@ export interface Enemy {
   health?: number;
   lastShot?: number;
   shotInterval?: number;
+  spawnTime?: number; // For consistent wave movement
 }
 
 export type BulletType = 'normal' | 'lightning' | 'fire';
