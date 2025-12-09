@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Difficulty } from '@/components/FlappyBird/types';
 
+const PLAYER_NAME_KEY = 'flappy-bird-player-name';
+
 interface LeaderboardEntry {
   id: string;
   player_name: string;
@@ -9,6 +11,16 @@ interface LeaderboardEntry {
 }
 
 export const useLeaderboard = () => {
+  // Get saved player name
+  const getSavedPlayerName = (): string | null => {
+    return localStorage.getItem(PLAYER_NAME_KEY);
+  };
+
+  // Save player name
+  const savePlayerName = (name: string) => {
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+  };
+
   // Check if score qualifies for leaderboard (top 20)
   const checkIfQualifies = async (score: number, difficulty: Difficulty): Promise<boolean> => {
     try {
@@ -21,15 +33,13 @@ export const useLeaderboard = () => {
 
       if (error) {
         console.error('Error checking leaderboard:', error);
-        return true; // Allow submission on error
+        return true;
       }
 
-      // If less than 20 entries, always qualifies
       if (!data || data.length < 20) {
         return true;
       }
 
-      // Check if score beats the lowest in top 20
       const lowestScore = data[data.length - 1]?.score || 0;
       return score > lowestScore;
     } catch (error) {
@@ -38,14 +48,56 @@ export const useLeaderboard = () => {
     }
   };
 
-  // Submit a new high score
+  // Check if player needs to enter name (first time or not in leaderboard yet)
+  const needsNameInput = async (score: number, difficulty: Difficulty): Promise<boolean> => {
+    const savedName = getSavedPlayerName();
+    
+    // No saved name - need input
+    if (!savedName) {
+      return true;
+    }
+
+    // Check if player already has an entry for this difficulty
+    const { data: existing } = await supabase
+      .from('leaderboard')
+      .select('id, score')
+      .eq('player_name', savedName)
+      .eq('difficulty', difficulty)
+      .maybeSingle();
+
+    // Player has entry - auto update if score is higher
+    if (existing) {
+      if (score > existing.score) {
+        await supabase
+          .from('leaderboard')
+          .update({ score, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+      }
+      return false; // Don't show name input
+    }
+
+    // Player doesn't have entry for this difficulty - auto insert
+    await supabase
+      .from('leaderboard')
+      .insert({
+        player_name: savedName,
+        score,
+        difficulty,
+      });
+
+    return false; // Don't show name input
+  };
+
+  // Submit a new high score (first time)
   const submitScore = async (
     playerName: string,
     score: number,
     difficulty: Difficulty
   ): Promise<boolean> => {
     try {
-      // Check if player already has a score for this difficulty
+      // Save player name for future
+      savePlayerName(playerName);
+
       const { data: existing } = await supabase
         .from('leaderboard')
         .select('id, score')
@@ -54,7 +106,6 @@ export const useLeaderboard = () => {
         .maybeSingle();
 
       if (existing) {
-        // Only update if new score is higher
         if (score > existing.score) {
           const { error } = await supabase
             .from('leaderboard')
@@ -67,7 +118,6 @@ export const useLeaderboard = () => {
           }
         }
       } else {
-        // Insert new entry
         const { error } = await supabase
           .from('leaderboard')
           .insert({
@@ -90,7 +140,10 @@ export const useLeaderboard = () => {
   };
 
   return {
+    getSavedPlayerName,
+    savePlayerName,
     checkIfQualifies,
+    needsNameInput,
     submitScore,
   };
 };
