@@ -321,6 +321,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
 
     const enemyY = 100 + Math.random() * (height - config.groundHeight - 200);
 
+    // Speed multipliers based on difficulty
+    const speedMultiplier = gameState.difficulty === 'easy' ? 0.6 : gameState.difficulty === 'hard' ? 0.85 : 1.0;
+    
     if (enemyType === 'bird') {
       enemiesRef.current.push({
         x: width + 50,
@@ -328,22 +331,24 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         type: 'bird',
         width: 35,
         height: 25,
-        velocityX: -180 - Math.random() * 80,
+        velocityX: (-150 - Math.random() * 60) * speedMultiplier,
         velocityY: 0,
         rotation: 0,
         health: 1,
         spawnTime: performance.now(),
       });
     } else if (enemyType === 'missile') {
+      // Missiles spawn at random Y position and move straight (no tracking)
+      const missileY = 100 + Math.random() * (height - config.groundHeight - 200);
       enemiesRef.current.push({
         x: width + 50,
-        y: birdRef.current.y,
+        y: missileY,
         type: 'missile',
         width: 40,
         height: 15,
-        velocityX: -250,
+        velocityX: (-200 - Math.random() * 50) * speedMultiplier,
         velocityY: 0,
-        rotation: 0,
+        rotation: 180,
         health: 1,
         spawnTime: performance.now(),
       });
@@ -743,18 +748,10 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
       enemy.x += enemy.velocityX * dt;
       enemy.y += enemy.velocityY * dt;
       
-      // Missiles track player with proper speed
+      // Missiles move straight horizontally - no tracking in any mode
       if (enemy.type === 'missile') {
-        const dx = bird.x - enemy.x;
-        const dy = bird.y - enemy.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const trackingSpeed = 280; // Total tracking speed
-        
-        if (distance > 0) {
-          enemy.velocityX = (dx / distance) * trackingSpeed * -0.3 - 250; // Maintain forward movement
-          enemy.velocityY = (dy / distance) * trackingSpeed * 0.8; // Strong vertical tracking
-        }
-        enemy.rotation = Math.atan2(enemy.velocityY, enemy.velocityX) * 180 / Math.PI;
+        // Keep moving straight, no tracking
+        enemy.rotation = 180; // Point left
       } else if (enemy.type === 'bird') {
         // Use spawnTime for consistent wave motion
         const wavePhase = enemy.spawnTime || 0;
