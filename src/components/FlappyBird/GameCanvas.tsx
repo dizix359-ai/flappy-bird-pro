@@ -321,8 +321,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
 
     const enemyY = 100 + Math.random() * (height - config.groundHeight - 200);
 
-    // Speed multipliers based on difficulty
-    const speedMultiplier = gameState.difficulty === 'easy' ? 0.6 : gameState.difficulty === 'hard' ? 0.85 : 1.0;
+    // Speed multipliers based on difficulty - enemies move LEFT (opposite to bird's direction)
+    const speedMultiplier = gameState.difficulty === 'easy' ? 0.5 : gameState.difficulty === 'hard' ? 0.8 : 1.2;
+    const baseEnemySpeed = config.pipeSpeed + 50; // Faster than pipes to challenge player
     
     if (enemyType === 'bird') {
       enemiesRef.current.push({
@@ -331,14 +332,13 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         type: 'bird',
         width: 35,
         height: 25,
-        velocityX: (-150 - Math.random() * 60) * speedMultiplier,
+        velocityX: -(baseEnemySpeed + Math.random() * 50) * speedMultiplier, // Move LEFT
         velocityY: 0,
-        rotation: 0,
+        rotation: 180, // Face left
         health: 1,
         spawnTime: performance.now(),
       });
     } else if (enemyType === 'missile') {
-      // Missiles spawn at random Y position and move straight (no tracking)
       const missileY = 100 + Math.random() * (height - config.groundHeight - 200);
       enemiesRef.current.push({
         x: width + 50,
@@ -346,14 +346,14 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         type: 'missile',
         width: 40,
         height: 15,
-        velocityX: (-200 - Math.random() * 50) * speedMultiplier,
+        velocityX: -(baseEnemySpeed + 80 + Math.random() * 60) * speedMultiplier, // Move LEFT, faster
         velocityY: 0,
-        rotation: 180,
+        rotation: 180, // Point left
         health: 1,
         spawnTime: performance.now(),
       });
     } else if (enemyType === 'bat') {
-      // Bats fly in groups with wavy motion
+      // Bats fly in groups with wavy motion - move LEFT
       const batCount = 2 + Math.floor(Math.random() * 2);
       for (let i = 0; i < batCount; i++) {
         enemiesRef.current.push({
@@ -362,9 +362,9 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           type: 'bat',
           width: 30,
           height: 20,
-          velocityX: -200 - Math.random() * 50,
+          velocityX: -(baseEnemySpeed + 30 + Math.random() * 40) * speedMultiplier, // Move LEFT
           velocityY: 0,
-          rotation: 0,
+          rotation: 180,
           health: 1,
           spawnTime: performance.now() + i * 100,
         });
@@ -882,13 +882,14 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           }
         }
       } else {
-        // Enemy bullets - check collision with bird shield
-        if (bird.hasShield && bird.shieldLevel === 2 && bird.shieldHits && bird.shieldHits > 0) {
-          const dx = bullet.x - bird.x;
-          const dy = bullet.y - bird.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < bullet.radius + bird.width / 2 + 10) {
+        // Enemy bullets (including cannon balls) - check collision with bird
+        const dx = bullet.x - bird.x;
+        const dy = bullet.y - bird.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < bullet.radius + bird.width / 2) {
+          // Check if bird has shield
+          if (bird.hasShield && bird.shieldLevel === 2 && bird.shieldHits && bird.shieldHits > 0) {
             // Enhanced shield absorbs bullet
             bird.shieldHits--;
             if (bird.shieldHits <= 0) {
@@ -897,6 +898,14 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
             }
             createParticles(bullet.x, bullet.y, 8, '#00FFFF', 'star');
             return false; // Remove bullet
+          } else if (bird.hasShield) {
+            // Normal shield blocks one hit
+            bird.hasShield = false;
+            createParticles(bullet.x, bullet.y, 10, '#FFFF00', 'star');
+            return false;
+          } else {
+            // No shield - bullet kills bird (handled by bulletCollision check)
+            return true; // Keep bullet for collision detection
           }
         }
       }
