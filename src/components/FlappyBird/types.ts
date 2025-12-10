@@ -160,17 +160,17 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, GameConfig> = {
     pipeGap: 200,
     groundHeight: 80,
     maxFallSpeed: 500,
-    // Easy mode - learning mode with slow hunters
+    // Easy mode - very few enemies, slow and straight movement
     hasCoins: true,
     hasEnemies: true,
     hasMovingPipes: false,
     coinSpawnChance: 0.5,
-    enemySpawnInterval: 12, // Very slow spawn
+    enemySpawnInterval: 15, // Very slow spawn - enemies appear rarely
     shieldSpawnChance: 0,
-    weaponSpawnChance: 0.2, // More weapons to learn
-    advancedEnemiesScore: 15, // Hunters appear after 15 points
-    hunterSpeedMultiplier: 0.4, // Very slow hunters
-    hunterShotInterval: 3000, // Slow shooting
+    weaponSpawnChance: 0.25, // More weapons to learn
+    advancedEnemiesScore: 20, // Hunters appear very late
+    hunterSpeedMultiplier: 0.35, // Very slow hunters
+    hunterShotInterval: 4000, // Very slow shooting
   },
   hard: {
     gravity: 2200,
@@ -180,17 +180,17 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, GameConfig> = {
     pipeGap: 160,
     groundHeight: 80,
     maxFallSpeed: 750,
-    // Hard mode - preparation for crazy
+    // Hard mode - moderate enemies, faster but straight movement
     hasCoins: true,
     hasEnemies: true,
     hasMovingPipes: false,
     coinSpawnChance: 0.6,
-    enemySpawnInterval: 8, // Faster than easy
-    shieldSpawnChance: 0.1, // Shields available
-    weaponSpawnChance: 0.15,
-    advancedEnemiesScore: 10, // Hunters appear after 10 points
-    hunterSpeedMultiplier: 0.6, // Medium speed hunters
-    hunterShotInterval: 2000, // Faster shooting than easy
+    enemySpawnInterval: 6, // Moderate spawn rate
+    shieldSpawnChance: 0.12,
+    weaponSpawnChance: 0.18,
+    advancedEnemiesScore: 12, // Hunters appear earlier
+    hunterSpeedMultiplier: 0.5, // Medium speed hunters
+    hunterShotInterval: 2500, // Moderate shooting speed
   },
   crazy: {
     gravity: 2400,
@@ -200,15 +200,16 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, GameConfig> = {
     pipeGap: 155,
     groundHeight: 80,
     maxFallSpeed: 800,
+    // Crazy mode - high density enemies, straight but fast
     hasCoins: true,
     hasEnemies: true,
     hasMovingPipes: true,
     coinSpawnChance: 0.7,
-    enemySpawnInterval: 3,
+    enemySpawnInterval: 2, // Very fast spawn - high density
     shieldSpawnChance: 0.15,
     weaponSpawnChance: 0.12,
-    advancedEnemiesScore: 20,
-    hunterSpeedMultiplier: 1.0, // Full speed
-    hunterShotInterval: 1200, // Fast shooting
+    advancedEnemiesScore: 15, // Advanced enemies appear earlier
+    hunterSpeedMultiplier: 0.8, // Faster but still no tracking
+    hunterShotInterval: 1500, // Fast shooting
   },
 };
