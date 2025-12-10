@@ -37,7 +37,7 @@ export interface Coin {
   rotation: number;
 }
 
-export type EnemyType = 'bird' | 'missile' | 'hunter' | 'plane';
+export type EnemyType = 'bird' | 'missile' | 'hunter' | 'plane' | 'bat' | 'cannon' | 'bear';
 
 export interface Enemy {
   x: number;
@@ -51,7 +51,9 @@ export interface Enemy {
   health?: number;
   lastShot?: number;
   shotInterval?: number;
-  spawnTime?: number; // For consistent wave movement
+  spawnTime?: number;
+  jumpPhase?: number; // For bear jumping
+  groundY?: number; // For ground-based enemies
 }
 
 export type BulletType = 'normal' | 'lightning' | 'fire';

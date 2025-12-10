@@ -302,7 +302,23 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
     const config = configRef.current;
     if (!config.hasEnemies) return;
 
-    const enemyType: 'bird' | 'missile' = Math.random() > 0.6 ? 'missile' : 'bird';
+    const isCrazy = gameState.difficulty === 'crazy';
+    const groundY = height - config.groundHeight;
+    
+    // In crazy mode, add new enemy types
+    const rand = Math.random();
+    let enemyType: 'bird' | 'missile' | 'bat' | 'cannon' | 'bear';
+    
+    if (isCrazy) {
+      if (rand < 0.25) enemyType = 'bird';
+      else if (rand < 0.4) enemyType = 'missile';
+      else if (rand < 0.6) enemyType = 'bat';
+      else if (rand < 0.75) enemyType = 'cannon';
+      else enemyType = 'bear';
+    } else {
+      enemyType = rand > 0.6 ? 'missile' : 'bird';
+    }
+
     const enemyY = 100 + Math.random() * (height - config.groundHeight - 200);
 
     if (enemyType === 'bird') {
@@ -313,12 +329,12 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         width: 35,
         height: 25,
         velocityX: -180 - Math.random() * 80,
-        velocityY: (Math.random() - 0.5) * 60,
+        velocityY: 0,
         rotation: 0,
         health: 1,
         spawnTime: performance.now(),
       });
-    } else {
+    } else if (enemyType === 'missile') {
       enemiesRef.current.push({
         x: width + 50,
         y: birdRef.current.y,
@@ -331,8 +347,57 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         health: 1,
         spawnTime: performance.now(),
       });
+    } else if (enemyType === 'bat') {
+      // Bats fly in groups with wavy motion
+      const batCount = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < batCount; i++) {
+        enemiesRef.current.push({
+          x: width + 50 + i * 30,
+          y: enemyY + (Math.random() - 0.5) * 40,
+          type: 'bat',
+          width: 30,
+          height: 20,
+          velocityX: -200 - Math.random() * 50,
+          velocityY: 0,
+          rotation: 0,
+          health: 1,
+          spawnTime: performance.now() + i * 100,
+        });
+      }
+    } else if (enemyType === 'cannon') {
+      // Ground cannon - fixed position, shoots at player
+      enemiesRef.current.push({
+        x: width + 50,
+        y: groundY - 30,
+        type: 'cannon',
+        width: 50,
+        height: 40,
+        velocityX: -config.pipeSpeed,
+        velocityY: 0,
+        rotation: 0,
+        health: 3,
+        lastShot: 0,
+        shotInterval: 1500 + Math.random() * 500,
+        groundY: groundY,
+      });
+    } else if (enemyType === 'bear') {
+      // Bear jumps from ground
+      enemiesRef.current.push({
+        x: width + 50,
+        y: groundY - 40,
+        type: 'bear',
+        width: 50,
+        height: 50,
+        velocityX: -config.pipeSpeed * 0.8,
+        velocityY: 0,
+        rotation: 0,
+        health: 2,
+        spawnTime: performance.now(),
+        jumpPhase: 0,
+        groundY: groundY,
+      });
     }
-  }, [width, height]);
+  }, [width, height, gameState.difficulty]);
 
   const spawnAdvancedEnemy = useCallback(() => {
     const config = configRef.current;
@@ -691,9 +756,52 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
         }
         enemy.rotation = Math.atan2(enemy.velocityY, enemy.velocityX) * 180 / Math.PI;
       } else if (enemy.type === 'bird') {
-        // Use spawnTime for consistent wave motion instead of changing x
+        // Use spawnTime for consistent wave motion
         const wavePhase = enemy.spawnTime || 0;
         enemy.y += Math.sin((now - wavePhase) / 300) * 50 * dt;
+      } else if (enemy.type === 'bat') {
+        // Bats have erratic wavy motion
+        const wavePhase = enemy.spawnTime || 0;
+        enemy.y += Math.sin((now - wavePhase) / 150) * 80 * dt;
+        enemy.rotation = Math.sin((now - wavePhase) / 100) * 15;
+      } else if (enemy.type === 'cannon') {
+        // Cannon stays on ground and shoots
+        enemy.y = (enemy.groundY || height - 80) - 30;
+        
+        if (enemy.lastShot === undefined) enemy.lastShot = now;
+        if (now - enemy.lastShot > (enemy.shotInterval || 1500)) {
+          // Shoot cannonball at player
+          const angle = Math.atan2(bird.y - enemy.y, bird.x - enemy.x);
+          bulletsRef.current.push({
+            x: enemy.x,
+            y: enemy.y - 10,
+            velocityX: Math.cos(angle) * 350,
+            velocityY: Math.sin(angle) * 350,
+            fromPlayer: false,
+            radius: 10,
+          });
+          enemy.lastShot = now;
+          createParticles(enemy.x, enemy.y - 10, 5, '#888888', 'explosion');
+        }
+      } else if (enemy.type === 'bear') {
+        // Bear jumps periodically
+        const groundY = enemy.groundY || height - 80;
+        enemy.jumpPhase = (enemy.jumpPhase || 0) + dt * 3;
+        
+        // Jump when player is close
+        const distToPlayer = Math.abs(bird.x - enemy.x);
+        if (distToPlayer < 200 && enemy.y >= groundY - 50) {
+          enemy.velocityY = -400; // Jump!
+        }
+        
+        // Apply gravity
+        enemy.velocityY += 800 * dt;
+        
+        // Keep on ground
+        if (enemy.y > groundY - 40) {
+          enemy.y = groundY - 40;
+          enemy.velocityY = 0;
+        }
       } else if (enemy.type === 'hunter') {
         // Hunter hovers and shoots
         enemy.y += Math.sin(now / 500 + enemy.x * 0.01) * 20 * dt;
@@ -711,7 +819,6 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
             radius: 6,
           });
           enemy.lastShot = now;
-          // Reduced particles for enemy shooting
           createParticles(enemy.x - enemy.width / 2, enemy.y, 3, '#FF4444', 'spark');
         }
       } else if (enemy.type === 'plane') {
@@ -1479,6 +1586,183 @@ export const GameCanvas = ({ width, height, onGameOver, onScoreUpdate, gameState
           ctx.fillRect(-20, -25, 40, 5);
           ctx.fillStyle = '#FFFF00';
           ctx.fillRect(-20, -25, 40 * ((enemy.health || 1) / 2), 5);
+        }
+      } else if (enemy.type === 'bat') {
+        // Bat enemy - dark and spooky
+        ctx.rotate(enemy.rotation * Math.PI / 180);
+        
+        // Body
+        ctx.fillStyle = '#2a1a3a';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, enemy.width / 3, enemy.height / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Wings
+        const wingFlap = Math.sin((enemy.spawnTime || 0) + time / 50) * 0.5;
+        ctx.fillStyle = '#1a0a2a';
+        // Left wing
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-enemy.width / 2, -15 + wingFlap * 20, -enemy.width / 2 - 5, 5);
+        ctx.quadraticCurveTo(-enemy.width / 3, 10, 0, 5);
+        ctx.fill();
+        // Right wing
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(enemy.width / 2, -15 + wingFlap * 20, enemy.width / 2 + 5, 5);
+        ctx.quadraticCurveTo(enemy.width / 3, 10, 0, 5);
+        ctx.fill();
+        
+        // Eyes (glowing red)
+        ctx.fillStyle = '#FF0000';
+        ctx.shadowColor = '#FF0000';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(-4, -3, 3, 0, Math.PI * 2);
+        ctx.arc(4, -3, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Ears
+        ctx.fillStyle = '#2a1a3a';
+        ctx.beginPath();
+        ctx.moveTo(-6, -enemy.height / 2 + 5);
+        ctx.lineTo(-3, -enemy.height / 2 - 5);
+        ctx.lineTo(0, -enemy.height / 2 + 5);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, -enemy.height / 2 + 5);
+        ctx.lineTo(3, -enemy.height / 2 - 5);
+        ctx.lineTo(6, -enemy.height / 2 + 5);
+        ctx.fill();
+        
+      } else if (enemy.type === 'cannon') {
+        // Ground cannon
+        
+        // Base/wheels
+        ctx.fillStyle = '#444444';
+        ctx.beginPath();
+        ctx.arc(-10, 15, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(10, 15, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Cannon body
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(-20, -5, 40, 20);
+        
+        // Cannon barrel
+        const bird = birdRef.current;
+        const barrelAngle = Math.atan2(bird.y - enemy.y, bird.x - enemy.x);
+        ctx.save();
+        ctx.rotate(barrelAngle);
+        ctx.fillStyle = '#222222';
+        ctx.fillRect(0, -6, 35, 12);
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.arc(35, 0, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // Muzzle flash
+        if (enemy.lastShot && time - enemy.lastShot < 150) {
+          ctx.save();
+          ctx.rotate(barrelAngle);
+          ctx.fillStyle = '#FFAA00';
+          ctx.beginPath();
+          ctx.arc(40, 0, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(40, 0, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        
+        // Health bar
+        if ((enemy.health || 0) > 0) {
+          ctx.fillStyle = '#333333';
+          ctx.fillRect(-20, -25, 40, 5);
+          ctx.fillStyle = '#FF6600';
+          ctx.fillRect(-20, -25, 40 * ((enemy.health || 1) / 3), 5);
+        }
+        
+      } else if (enemy.type === 'bear') {
+        // Brown bear
+        
+        // Body
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.ellipse(0, 5, enemy.width / 2.2, enemy.height / 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Head
+        ctx.fillStyle = '#A0522D';
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3, -10, 18, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Ears
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3 - 12, -25, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3 + 12, -25, 7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Snout
+        ctx.fillStyle = '#DEB887';
+        ctx.beginPath();
+        ctx.ellipse(-enemy.width / 3 - 10, -5, 10, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Nose
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3 - 15, -6, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Eyes (angry)
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3 - 5, -15, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-enemy.width / 3 + 8, -15, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Angry eyebrows
+        ctx.strokeStyle = '#5D3A1A';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-enemy.width / 3 - 10, -22);
+        ctx.lineTo(-enemy.width / 3, -18);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-enemy.width / 3 + 13, -22);
+        ctx.lineTo(-enemy.width / 3 + 3, -18);
+        ctx.stroke();
+        
+        // Legs
+        ctx.fillStyle = '#6B3A0A';
+        ctx.fillRect(-15, enemy.height / 3, 12, 15);
+        ctx.fillRect(5, enemy.height / 3, 12, 15);
+        
+        // Claws
+        ctx.fillStyle = '#333333';
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(-15 + i * 4, enemy.height / 3 + 13, 2, 5);
+          ctx.fillRect(5 + i * 4, enemy.height / 3 + 13, 2, 5);
+        }
+        
+        // Health bar
+        if ((enemy.health || 0) > 0) {
+          ctx.fillStyle = '#333333';
+          ctx.fillRect(-20, -40, 40, 5);
+          ctx.fillStyle = '#00FF00';
+          ctx.fillRect(-20, -40, 40 * ((enemy.health || 1) / 2), 5);
         }
       }
       
