@@ -95,7 +95,53 @@ export const AngryBirdsGame = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-400 via-red-500 to-red-700 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center p-4 overflow-hidden relative">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Stars */}
+        {[...Array(30)].map((_, i) => (
+          <motion.div
+            key={`star-${i}`}
+            className="absolute w-1 h-1 bg-white rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 40}%`,
+            }}
+            animate={{
+              opacity: [0.3, 1, 0.3],
+              scale: [1, 1.5, 1],
+            }}
+            transition={{
+              duration: 2 + Math.random() * 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
+        ))}
+        
+        {/* Floating clouds */}
+        {[...Array(5)].map((_, i) => (
+          <motion.div
+            key={`cloud-${i}`}
+            className="absolute bg-white/20 rounded-full blur-xl"
+            style={{
+              width: 100 + Math.random() * 150,
+              height: 40 + Math.random() * 30,
+              top: `${10 + Math.random() * 30}%`,
+            }}
+            animate={{
+              x: [-200, window.innerWidth + 200],
+            }}
+            transition={{
+              duration: 30 + Math.random() * 20,
+              repeat: Infinity,
+              delay: i * 8,
+              ease: "linear",
+            }}
+          />
+        ))}
+      </div>
+
       <AnimatePresence mode="wait">
         {gameStatus === 'menu' ? (
           <motion.div
@@ -103,49 +149,86 @@ export const AngryBirdsGame = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-4xl"
+            className="w-full max-w-5xl z-10"
           >
             {/* Header */}
             <div className="text-center mb-8">
-              <motion.h1
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                className="text-4xl md:text-6xl font-bold text-white drop-shadow-lg mb-2"
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", bounce: 0.5 }}
+                className="relative inline-block"
               >
-                الطيور الغاضبة
-              </motion.h1>
-              <p className="text-white/80 text-lg">ضد الخنازير الحديدية الغازية!</p>
+                {/* Title glow effect */}
+                <div className="absolute inset-0 blur-xl bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 opacity-50" />
+                <h1 className="relative text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-400 to-red-600 drop-shadow-2xl mb-2 tracking-tight">
+                  الطيور الغاضبة
+                </h1>
+              </motion.div>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-white/90 text-xl font-medium mt-2"
+              >
+                ⚔️ ضد الخنازير الحديدية الغازية! ⚔️
+              </motion.p>
               
-              <button
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
                 onClick={() => navigate('/')}
-                className="mt-4 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-6 py-2 rounded-full text-white font-bold transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-6 bg-white/10 hover:bg-white/20 backdrop-blur-md px-8 py-3 rounded-2xl text-white font-bold transition-all border border-white/30 shadow-lg"
               >
                 ← العودة للألعاب
-              </button>
+              </motion.button>
             </div>
 
             {/* Bird Types Legend */}
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-4 mb-6">
-              <h3 className="text-white font-bold mb-3 text-center">أنواع الطيور</h3>
-              <div className="flex flex-wrap justify-center gap-4">
-                {(['red', 'yellow', 'black', 'white'] as const).map(type => (
-                  <div key={type} className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-gradient-to-br from-black/40 to-black/20 backdrop-blur-lg rounded-3xl p-6 mb-8 border border-white/10 shadow-2xl"
+            >
+              <h3 className="text-white font-bold mb-4 text-center text-lg">🐦 أنواع الطيور</h3>
+              <div className="flex flex-wrap justify-center gap-3">
+                {(['red', 'yellow', 'black', 'white'] as const).map((type, index) => (
+                  <motion.div 
+                    key={type} 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 + index * 0.1 }}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    className="flex items-center gap-3 bg-gradient-to-r from-white/15 to-white/5 rounded-2xl px-5 py-3 border border-white/10 shadow-lg"
+                  >
                     <div
-                      className="w-8 h-8 rounded-full"
-                      style={{ backgroundColor: BIRD_PROPERTIES[type].color }}
-                    />
-                    <div className="text-white text-sm">
-                      <div className="font-bold">{BIRD_PROPERTIES[type].description}</div>
+                      className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-2xl border-2 border-white/30"
+                      style={{ 
+                        background: `radial-gradient(circle at 30% 30%, ${BIRD_PROPERTIES[type].color}aa, ${BIRD_PROPERTIES[type].color})`,
+                        boxShadow: `0 4px 15px ${BIRD_PROPERTIES[type].color}50`
+                      }}
+                    >
+                      {type === 'red' && '😠'}
+                      {type === 'yellow' && '⚡'}
+                      {type === 'black' && '💣'}
+                      {type === 'white' && '🥚'}
+                    </div>
+                    <div className="text-white">
+                      <div className="font-bold text-sm">{BIRD_PROPERTIES[type].description}</div>
                       <div className="text-white/60 text-xs">{BIRD_PROPERTIES[type].special}</div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Levels Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {LEVELS.map(level => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {LEVELS.map((level, index) => {
                 const isUnlocked = progress.unlockedLevels.includes(level.id);
                 const stars = progress.levelStars[level.id] || 0;
                 const highScore = progress.highScores[level.id] || 0;
@@ -153,58 +236,95 @@ export const AngryBirdsGame = () => {
                 return (
                   <motion.div
                     key={level.id}
-                    whileHover={isUnlocked ? { scale: 1.05 } : {}}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 + index * 0.15 }}
+                    whileHover={isUnlocked ? { scale: 1.03, y: -5 } : {}}
                     whileTap={isUnlocked ? { scale: 0.98 } : {}}
                     onClick={() => handleLevelSelect(level)}
                     className={`
-                      relative p-6 rounded-2xl cursor-pointer transition-all
+                      relative p-6 rounded-3xl cursor-pointer transition-all overflow-hidden
                       ${isUnlocked
-                        ? 'bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg hover:shadow-xl'
-                        : 'bg-gray-600/50 cursor-not-allowed'
+                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 shadow-2xl hover:shadow-orange-500/40'
+                        : 'bg-gradient-to-br from-slate-600/50 to-slate-800/50 cursor-not-allowed border border-white/10'
                       }
                     `}
                   >
+                    {/* Decorative elements for unlocked levels */}
+                    {isUnlocked && (
+                      <>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
+                      </>
+                    )}
+                    
                     {!isUnlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-6xl">🔒</span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-3xl">
+                        <motion.span 
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="text-7xl drop-shadow-lg"
+                        >
+                          🔒
+                        </motion.span>
                       </div>
                     )}
                     
-                    <div className={isUnlocked ? 'text-white' : 'text-white/30'}>
-                      <div className="text-lg font-bold mb-1">المستوى {level.id}</div>
-                      <div className="text-2xl font-bold mb-2">{level.nameAr}</div>
-                      <div className="text-sm opacity-80">{level.name}</div>
+                    <div className={`relative ${isUnlocked ? 'text-white' : 'text-white/30'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
+                          المستوى {level.id}
+                        </span>
+                        {isUnlocked && highScore > 0 && (
+                          <span className="text-xs bg-black/20 px-2 py-1 rounded-full">
+                            🏆 {highScore}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <h3 className="text-3xl font-black mb-1">{level.nameAr}</h3>
+                      <p className="text-sm opacity-80 font-medium">{level.name}</p>
                       
                       {isUnlocked && (
                         <>
                           {/* Stars */}
-                          <div className="flex gap-1 mt-3">
+                          <div className="flex gap-2 mt-4">
                             {[1, 2, 3].map(i => (
-                              <span
+                              <motion.span
                                 key={i}
-                                className={`text-2xl ${i <= stars ? '' : 'opacity-30'}`}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.5 + i * 0.1, type: "spring" }}
+                                className={`text-3xl drop-shadow-lg ${i <= stars ? '' : 'opacity-30 grayscale'}`}
                               >
                                 ⭐
-                              </span>
+                              </motion.span>
                             ))}
                           </div>
                           
-                          {highScore > 0 && (
-                            <div className="text-sm mt-2 opacity-80">
-                              أعلى نتيجة: {highScore}
-                            </div>
-                          )}
-                          
                           {/* Birds preview */}
-                          <div className="flex gap-1 mt-3">
+                          <div className="flex gap-2 mt-4">
                             {level.birds.map((type, i) => (
-                              <div
+                              <motion.div
                                 key={i}
-                                className="w-6 h-6 rounded-full border-2 border-white/50"
-                                style={{ backgroundColor: BIRD_PROPERTIES[type].color }}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.6 + i * 0.05 }}
+                                className="w-8 h-8 rounded-full border-2 border-white/50 shadow-md"
+                                style={{ 
+                                  background: `radial-gradient(circle at 30% 30%, ${BIRD_PROPERTIES[type].color}cc, ${BIRD_PROPERTIES[type].color})`
+                                }}
                               />
                             ))}
                           </div>
+                          
+                          {/* Play button */}
+                          <motion.div 
+                            whileHover={{ scale: 1.05 }}
+                            className="mt-4 bg-white/20 hover:bg-white/30 rounded-2xl py-3 text-center font-bold transition-all"
+                          >
+                            ▶️ العب الآن
+                          </motion.div>
                         </>
                       )}
                     </div>
@@ -219,7 +339,7 @@ export const AngryBirdsGame = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="relative"
+            className="relative z-10"
           >
             {selectedLevel && (
               <AngryBirdsCanvas
@@ -239,59 +359,77 @@ export const AngryBirdsGame = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50"
             onClick={handleBackToMenu}
           >
             <motion.div
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
+              initial={{ scale: 0.8, y: 50, rotateX: 20 }}
+              animate={{ scale: 1, y: 0, rotateX: 0 }}
               exit={{ scale: 0.8, y: 50 }}
               onClick={e => e.stopPropagation()}
-              className="bg-gradient-to-br from-yellow-400 to-orange-500 p-8 rounded-3xl text-center text-white shadow-2xl max-w-md"
+              className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 p-10 rounded-[2rem] text-center text-white shadow-2xl max-w-md border-4 border-white/20"
             >
-              <h2 className="text-3xl font-bold mb-4">
-                {showResult.stars > 0 ? '🎉 أحسنت! 🎉' : '😅 حاول مرة أخرى!'}
-              </h2>
+              <motion.h2 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", bounce: 0.6 }}
+                className="text-4xl font-black mb-6"
+              >
+                {showResult.stars > 0 ? '🎉 أحسنت! 🎉' : '💪 حاول مرة أخرى!'}
+              </motion.h2>
               
-              <div className="flex justify-center gap-2 mb-4">
+              <div className="flex justify-center gap-3 mb-6">
                 {[1, 2, 3].map(i => (
                   <motion.span
                     key={i}
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: i * 0.2 }}
-                    className={`text-5xl ${i <= showResult.stars ? '' : 'opacity-30'}`}
+                    transition={{ delay: i * 0.15, type: "spring", bounce: 0.6 }}
+                    className={`text-6xl drop-shadow-lg ${i <= showResult.stars ? '' : 'opacity-30 grayscale'}`}
                   >
                     ⭐
                   </motion.span>
                 ))}
               </div>
               
-              <p className="text-2xl font-bold mb-6">النتيجة: {showResult.score}</p>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="text-3xl font-black mb-8"
+              >
+                النتيجة: <span className="text-yellow-300">{showResult.score}</span>
+              </motion.p>
               
-              <div className="flex gap-4 justify-center">
-                <button
+              <div className="flex gap-3 justify-center flex-wrap">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleRetry}
-                  className="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-full font-bold transition-all"
+                  className="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-2xl font-bold transition-all border border-white/30"
                 >
                   🔄 إعادة
-                </button>
+                </motion.button>
                 
                 {showResult.stars > 0 && selectedLevel && selectedLevel.id < LEVELS.length && (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handleNextLevel}
-                    className="bg-white text-orange-500 hover:bg-white/90 px-6 py-3 rounded-full font-bold transition-all"
+                    className="bg-white text-orange-600 hover:bg-white/90 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg"
                   >
                     المستوى التالي ➡️
-                  </button>
+                  </motion.button>
                 )}
                 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleBackToMenu}
-                  className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-full font-bold transition-all"
+                  className="bg-red-700 hover:bg-red-800 px-6 py-3 rounded-2xl font-bold transition-all border border-red-500/50"
                 >
                   القائمة
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>
