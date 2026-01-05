@@ -87,11 +87,14 @@ export const AngryBirdsGame = () => {
 
   const handleRetry = () => {
     setShowResult(null);
-    // Force re-render by toggling status
-    setGameStatus('menu');
-    setTimeout(() => {
-      setGameStatus('playing');
-    }, 10);
+    // Create a new level object to force re-render
+    if (selectedLevel) {
+      const levelCopy = { ...selectedLevel, _retry: Date.now() };
+      setSelectedLevel(null);
+      setTimeout(() => {
+        setSelectedLevel(levelCopy as Level);
+      }, 50);
+    }
   };
 
   return (

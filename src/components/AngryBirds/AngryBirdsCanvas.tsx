@@ -45,6 +45,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const isDraggingRef = useRef(false);
   const dragCurrentRef = useRef({ x: SLINGSHOT_X, y: SLINGSHOT_Y });
   const timeRef = useRef(0);
+  const birdTransitionRef = useRef(false);
+  const gameEndedRef = useRef(false);
 
   // Initialize level
   useEffect(() => {
@@ -89,6 +91,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     eggsRef.current = [];
     explosionsRef.current = [];
     particlesRef.current = [];
+    birdTransitionRef.current = false;
+    gameEndedRef.current = false;
     setCurrentBirdIndex(0);
     setScore(0);
     setGameStatus('waiting');
@@ -465,17 +469,25 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       if (bird.y + bird.radius > groundY) {
         bird.y = groundY - bird.radius;
         bird.hasLanded = true;
-        bird.velocityX *= 0.3;
-        bird.velocityY = 0;
+        bird.velocityX *= 0.4;
+        bird.velocityY = -bird.velocityY * 0.2;
+        if (Math.abs(bird.velocityY) < 1) bird.velocityY = 0;
         createDebris(bird.x, bird.y, '#8B7355');
+      }
+      
+      // Apply friction when on ground
+      if (bird.hasLanded) {
+        bird.velocityX *= 0.92;
+        if (Math.abs(bird.velocityX) < 0.1) bird.velocityX = 0;
       }
       
       // Wall collision
       if (bird.x < bird.radius) {
         bird.x = bird.radius;
         bird.velocityX *= -0.5;
+        bird.hasLanded = true;
       }
-      if (bird.x > canvasRef.current!.width - bird.radius) {
+      if (bird.x > canvasRef.current!.width + bird.radius) {
         bird.hasLanded = true;
       }
       
@@ -604,16 +616,25 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       return exp.life > 0;
     });
     
-    // Check if bird stopped and load next
-    if (currentBirdRef.current?.hasLanded && gameStatus === 'flying') {
-      const bird = currentBirdRef.current;
-      if (Math.abs(bird.velocityX) < 0.3) {
+  // Check if bird stopped and load next
+  if (currentBirdRef.current && gameStatus === 'flying') {
+    const bird = currentBirdRef.current;
+    const isOutOfBounds = bird.x > canvasRef.current!.width + 50 || bird.x < -50;
+    const hasStopped = bird.hasLanded && Math.abs(bird.velocityX) < 0.5 && Math.abs(bird.velocityY) < 0.5;
+    const hasBeenFlyingLong = bird.isFlying && timeRef.current > 0 && bird.hasLanded;
+    
+    if (isOutOfBounds || hasStopped || (hasBeenFlyingLong && Math.abs(bird.velocityX) < 0.3)) {
+      // Use a ref to prevent multiple timeouts
+      if (!birdTransitionRef.current) {
+        birdTransitionRef.current = true;
         setTimeout(() => {
           loadNextBird();
-        }, 700);
+          birdTransitionRef.current = false;
+        }, 500);
       }
     }
-  };
+  }
+};
 
   const loadNextBird = () => {
     const nextIndex = currentBirdIndex + 1;
@@ -638,11 +659,26 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   };
 
   const checkGameEnd = () => {
-    if (gameStatus === 'finished') {
-      if (pigsRef.current.length === 0) {
-        const starsEarned = score >= level.stars[2] ? 3 : score >= level.stars[1] ? 2 : score >= level.stars[0] ? 1 : 0;
-        onLevelComplete(score, starsEarned);
-      }
+    if (gameEndedRef.current) return;
+    
+    // Win condition: all pigs destroyed
+    if (pigsRef.current.length === 0) {
+      gameEndedRef.current = true;
+      const finalScore = score + (birdsRef.current.length - currentBirdIndex - 1) * 1000; // Bonus for unused birds
+      setScore(finalScore);
+      const starsEarned = finalScore >= level.stars[2] ? 3 : finalScore >= level.stars[1] ? 2 : finalScore >= level.stars[0] ? 1 : 0;
+      setTimeout(() => {
+        onLevelComplete(finalScore, Math.max(1, starsEarned));
+      }, 800);
+      return;
+    }
+    
+    // Lose condition: no more birds and pigs still alive
+    if (gameStatus === 'finished' && pigsRef.current.length > 0) {
+      gameEndedRef.current = true;
+      setTimeout(() => {
+        onLevelComplete(score, 0);
+      }, 800);
     }
   };
 
