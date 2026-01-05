@@ -45,6 +45,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const isDraggingRef = useRef(false);
   const dragCurrentRef = useRef({ x: SLINGSHOT_X, y: SLINGSHOT_Y });
   const timeRef = useRef(0);
+  const flightTimeRef = useRef(0);
   const birdTransitionRef = useRef(false);
   const gameEndedRef = useRef(false);
 
@@ -93,6 +94,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     particlesRef.current = [];
     birdTransitionRef.current = false;
     gameEndedRef.current = false;
+    timeRef.current = 0;
+    flightTimeRef.current = 0;
     setCurrentBirdIndex(0);
     setScore(0);
     setGameStatus('waiting');
@@ -225,6 +228,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     currentBirdRef.current.velocityX = dx * power;
     currentBirdRef.current.velocityY = dy * power;
     currentBirdRef.current.isFlying = true;
+    flightTimeRef.current = 0;
     
     setGameStatus('flying');
   }, []);
@@ -445,50 +449,60 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     const groundY = canvasHeight - GROUND_HEIGHT;
     
     // Update current bird
-    if (currentBirdRef.current?.isFlying && !currentBirdRef.current.hasLanded) {
+    if (currentBirdRef.current?.isFlying) {
       const bird = currentBirdRef.current;
-      bird.velocityY += GRAVITY;
-      bird.x += bird.velocityX;
-      bird.y += bird.velocityY;
-      bird.rotation += bird.velocityX * 0.03;
+      flightTimeRef.current += 0.016;
       
-      // Trail effect for flying bird
-      if (Math.random() > 0.6) {
-        particlesRef.current.push({
-          x: bird.x - bird.velocityX * 0.5,
-          y: bird.y,
-          vx: (Math.random() - 0.5) * 2,
-          vy: (Math.random() - 0.5) * 2,
-          life: 0.6,
-          color: BIRD_PROPERTIES[bird.type].color,
-          size: 4,
-        });
-      }
-      
-      // Ground collision
-      if (bird.y + bird.radius > groundY) {
-        bird.y = groundY - bird.radius;
-        bird.hasLanded = true;
-        bird.velocityX *= 0.4;
-        bird.velocityY = -bird.velocityY * 0.2;
-        if (Math.abs(bird.velocityY) < 1) bird.velocityY = 0;
-        createDebris(bird.x, bird.y, '#8B7355');
-      }
-      
-      // Apply friction when on ground
-      if (bird.hasLanded) {
+      if (!bird.hasLanded) {
+        bird.velocityY += GRAVITY;
+        bird.x += bird.velocityX;
+        bird.y += bird.velocityY;
+        bird.rotation += bird.velocityX * 0.03;
+        
+        // Trail effect for flying bird
+        if (Math.random() > 0.6) {
+          particlesRef.current.push({
+            x: bird.x - bird.velocityX * 0.5,
+            y: bird.y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            life: 0.6,
+            color: BIRD_PROPERTIES[bird.type].color,
+            size: 4,
+          });
+        }
+        
+        // Ground collision
+        if (bird.y + bird.radius > groundY) {
+          bird.y = groundY - bird.radius;
+          bird.hasLanded = true;
+          bird.velocityX *= 0.4;
+          bird.velocityY = -bird.velocityY * 0.2;
+          if (Math.abs(bird.velocityY) < 1) bird.velocityY = 0;
+          createDebris(bird.x, bird.y, '#8B7355');
+        }
+        
+        // Top boundary check - bird went too high
+        if (bird.y < -100) {
+          bird.hasLanded = true;
+        }
+        
+        // Left wall collision
+        if (bird.x < bird.radius) {
+          bird.x = bird.radius;
+          bird.velocityX *= -0.5;
+          bird.hasLanded = true;
+        }
+        
+        // Right boundary - bird flew off screen
+        if (bird.x > canvasRef.current!.width + 50) {
+          bird.hasLanded = true;
+        }
+      } else {
+        // Apply friction when on ground
         bird.velocityX *= 0.92;
+        bird.velocityY = 0;
         if (Math.abs(bird.velocityX) < 0.1) bird.velocityX = 0;
-      }
-      
-      // Wall collision
-      if (bird.x < bird.radius) {
-        bird.x = bird.radius;
-        bird.velocityX *= -0.5;
-        bird.hasLanded = true;
-      }
-      if (bird.x > canvasRef.current!.width + bird.radius) {
-        bird.hasLanded = true;
       }
       
       // Block collision
@@ -616,27 +630,38 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       return exp.life > 0;
     });
     
-  // Check if bird stopped and load next
-  if (currentBirdRef.current && gameStatus === 'flying') {
-    const bird = currentBirdRef.current;
-    const isOutOfBounds = bird.x > canvasRef.current!.width + 50 || bird.x < -50;
-    const hasStopped = bird.hasLanded && Math.abs(bird.velocityX) < 0.5 && Math.abs(bird.velocityY) < 0.5;
-    const hasBeenFlyingLong = bird.isFlying && timeRef.current > 0 && bird.hasLanded;
-    
-    if (isOutOfBounds || hasStopped || (hasBeenFlyingLong && Math.abs(bird.velocityX) < 0.3)) {
-      // Use a ref to prevent multiple timeouts
-      if (!birdTransitionRef.current) {
+    // Check if bird stopped and load next
+    if (currentBirdRef.current && gameStatus === 'flying' && !gameEndedRef.current) {
+      const bird = currentBirdRef.current;
+      const isOutOfBounds = bird.x > canvasRef.current!.width + 50 || bird.x < -50 || bird.y < -100;
+      const hasStopped = bird.hasLanded && Math.abs(bird.velocityX) < 0.3;
+      const flownTooLong = flightTimeRef.current > 8; // Max 8 seconds flight
+      
+      if ((isOutOfBounds || hasStopped || flownTooLong) && !birdTransitionRef.current) {
         birdTransitionRef.current = true;
+        
+        // Wait a bit for physics to settle before loading next bird
         setTimeout(() => {
-          loadNextBird();
+          // Double check game hasn't ended
+          if (!gameEndedRef.current) {
+            loadNextBird();
+          }
           birdTransitionRef.current = false;
-        }, 500);
+        }, 600);
       }
     }
-  }
-};
+  };
 
   const loadNextBird = () => {
+    // Don't load if game already ended
+    if (gameEndedRef.current) return;
+    
+    // Check if all pigs destroyed first
+    if (pigsRef.current.length === 0) {
+      checkGameEnd();
+      return;
+    }
+    
     const nextIndex = currentBirdIndex + 1;
     if (nextIndex < birdsRef.current.length) {
       setCurrentBirdIndex(nextIndex);
@@ -644,10 +669,19 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         ...birdsRef.current[nextIndex],
         x: SLINGSHOT_X,
         y: SLINGSHOT_Y,
+        isFlying: false,
+        hasLanded: false,
+        specialUsed: false,
+        velocityX: 0,
+        velocityY: 0,
+        rotation: 0,
       };
+      flightTimeRef.current = 0;
       setGameStatus('waiting');
     } else {
+      // No more birds
       setGameStatus('finished');
+      checkGameEnd();
     }
   };
 
@@ -658,29 +692,35 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     return dist < bird.radius;
   };
 
-  const checkGameEnd = () => {
+  const checkGameEnd = useCallback(() => {
     if (gameEndedRef.current) return;
     
     // Win condition: all pigs destroyed
     if (pigsRef.current.length === 0) {
       gameEndedRef.current = true;
-      const finalScore = score + (birdsRef.current.length - currentBirdIndex - 1) * 1000; // Bonus for unused birds
-      setScore(finalScore);
+      // Calculate bonus for unused birds
+      const unusedBirds = birdsRef.current.length - currentBirdIndex - 1;
+      const bonus = Math.max(0, unusedBirds) * 1000;
+      const finalScore = score + bonus;
+      
       const starsEarned = finalScore >= level.stars[2] ? 3 : finalScore >= level.stars[1] ? 2 : finalScore >= level.stars[0] ? 1 : 0;
+      
+      // Update score display and notify after delay
+      setScore(finalScore);
       setTimeout(() => {
         onLevelComplete(finalScore, Math.max(1, starsEarned));
-      }, 800);
+      }, 1000);
       return;
     }
     
-    // Lose condition: no more birds and pigs still alive
+    // Lose condition: game finished (no more birds) and pigs still alive
     if (gameStatus === 'finished' && pigsRef.current.length > 0) {
       gameEndedRef.current = true;
       setTimeout(() => {
         onLevelComplete(score, 0);
-      }, 800);
+      }, 1000);
     }
-  };
+  }, [score, currentBirdIndex, level.stars, gameStatus, onLevelComplete]);
 
   // Drawing functions
   const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number) => {

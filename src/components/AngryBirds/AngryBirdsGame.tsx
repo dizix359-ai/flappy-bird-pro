@@ -87,13 +87,26 @@ export const AngryBirdsGame = () => {
 
   const handleRetry = () => {
     setShowResult(null);
-    // Create a new level object to force re-render
     if (selectedLevel) {
-      const levelCopy = { ...selectedLevel, _retry: Date.now() };
-      setSelectedLevel(null);
-      setTimeout(() => {
-        setSelectedLevel(levelCopy as Level);
-      }, 50);
+      // Find the original level to get clean data
+      const originalLevel = LEVELS.find(l => l.id === selectedLevel.id);
+      if (originalLevel) {
+        // Create a fresh copy with a timestamp to force re-mount
+        const freshLevel: Level = {
+          ...originalLevel,
+          birds: [...originalLevel.birds],
+          pigs: originalLevel.pigs.map(p => ({ ...p })),
+          blocks: originalLevel.blocks.map(b => ({ ...b })),
+          stars: [...originalLevel.stars] as [number, number, number],
+        };
+        setSelectedLevel(null);
+        // Use requestAnimationFrame for more reliable timing
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setSelectedLevel(freshLevel);
+          });
+        });
+      }
     }
   };
 
