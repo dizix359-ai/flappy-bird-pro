@@ -48,6 +48,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const flightTimeRef = useRef(0);
   const birdTransitionRef = useRef(false);
   const gameEndedRef = useRef(false);
+  const launchTimeRef = useRef(0); // Track when bird was launched to prevent immediate ability activation
+  const justLaunchedRef = useRef(false); // Flag to prevent click immediately after launch
 
   // Initialize level
   useEffect(() => {
@@ -96,6 +98,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     gameEndedRef.current = false;
     timeRef.current = 0;
     flightTimeRef.current = 0;
+    launchTimeRef.current = 0;
+    justLaunchedRef.current = false;
     setCurrentBirdIndex(0);
     setScore(0);
     setGameStatus('waiting');
@@ -229,6 +233,13 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     currentBirdRef.current.velocityY = dy * power;
     currentBirdRef.current.isFlying = true;
     flightTimeRef.current = 0;
+    launchTimeRef.current = Date.now(); // Record launch time
+    justLaunchedRef.current = true; // Set flag to block immediate click
+    
+    // Clear the flag after a short delay
+    setTimeout(() => {
+      justLaunchedRef.current = false;
+    }, 300);
     
     setGameStatus('flying');
   }, []);
@@ -239,6 +250,10 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     
     const bird = currentBirdRef.current;
     if (bird.specialUsed) return;
+    
+    // Prevent ability activation immediately after launch (within 400ms)
+    const timeSinceLaunch = Date.now() - launchTimeRef.current;
+    if (timeSinceLaunch < 400 || justLaunchedRef.current) return;
     
     if (bird.type === 'yellow') {
       // Speed boost
