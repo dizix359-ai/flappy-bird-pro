@@ -1039,60 +1039,97 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     ctx.ellipse(0, bird.radius * 0.38, bird.radius * 0.58, bird.radius * 0.38, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Eyes
+    // Eyes - closer together and more intense
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.ellipse(-bird.radius * 0.3, -bird.radius * 0.12, bird.radius * 0.24, bird.radius * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(-bird.radius * 0.25, -bird.radius * 0.05, bird.radius * 0.22, bird.radius * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(bird.radius * 0.3, -bird.radius * 0.12, bird.radius * 0.24, bird.radius * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(bird.radius * 0.25, -bird.radius * 0.05, bird.radius * 0.22, bird.radius * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Pupils (looking forward when flying)
-    const pupilOffsetX = bird.isFlying ? bird.radius * 0.1 : 0;
+    // Eye outlines
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(-bird.radius * 0.25, -bird.radius * 0.05, bird.radius * 0.22, bird.radius * 0.28, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(bird.radius * 0.25, -bird.radius * 0.05, bird.radius * 0.22, bird.radius * 0.28, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Pupils - looking forward aggressively when flying
+    const pupilOffsetX = bird.isFlying ? bird.radius * 0.12 : bird.radius * 0.05;
+    const pupilOffsetY = bird.isFlying ? -bird.radius * 0.02 : 0;
     ctx.fillStyle = '#1a1a1a';
     ctx.beginPath();
-    ctx.arc(-bird.radius * 0.22 + pupilOffsetX, -bird.radius * 0.08, bird.radius * 0.12, 0, Math.PI * 2);
+    ctx.arc(-bird.radius * 0.18 + pupilOffsetX, -bird.radius * 0.02 + pupilOffsetY, bird.radius * 0.13, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(bird.radius * 0.38 + pupilOffsetX, -bird.radius * 0.08, bird.radius * 0.12, 0, Math.PI * 2);
+    ctx.arc(bird.radius * 0.32 + pupilOffsetX, -bird.radius * 0.02 + pupilOffsetY, bird.radius * 0.13, 0, Math.PI * 2);
     ctx.fill();
     
-    // Eye highlights
+    // Eye highlights - smaller and sharper
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(-bird.radius * 0.26 + pupilOffsetX, -bird.radius * 0.14, bird.radius * 0.05, 0, Math.PI * 2);
+    ctx.arc(-bird.radius * 0.22 + pupilOffsetX, -bird.radius * 0.08 + pupilOffsetY, bird.radius * 0.04, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(bird.radius * 0.34 + pupilOffsetX, -bird.radius * 0.14, bird.radius * 0.05, 0, Math.PI * 2);
+    ctx.arc(bird.radius * 0.28 + pupilOffsetX, -bird.radius * 0.08 + pupilOffsetY, bird.radius * 0.04, 0, Math.PI * 2);
     ctx.fill();
     
-    // Angry eyebrows
-    ctx.fillStyle = bird.type === 'black' ? '#2d2d2d' : '#4e342e';
+    // ANGRY EYEBROWS - thick and angled down towards center (V shape)
+    ctx.fillStyle = bird.type === 'black' ? '#1a1a1a' : '#3e2723';
+    ctx.strokeStyle = bird.type === 'black' ? '#000' : '#2d1b14';
+    ctx.lineWidth = 1;
+    
+    // Left eyebrow - angled down towards right (center)
     ctx.save();
-    ctx.translate(-bird.radius * 0.3, -bird.radius * 0.45);
-    ctx.rotate(-0.4);
-    ctx.fillRect(-bird.radius * 0.28, 0, bird.radius * 0.45, bird.radius * 0.12);
-    ctx.restore();
-    ctx.save();
-    ctx.translate(bird.radius * 0.3, -bird.radius * 0.45);
-    ctx.rotate(0.4);
-    ctx.fillRect(-bird.radius * 0.17, 0, bird.radius * 0.45, bird.radius * 0.12);
+    ctx.translate(-bird.radius * 0.25, -bird.radius * 0.35);
+    ctx.rotate(0.5); // Positive angle - slopes down to right
+    ctx.beginPath();
+    ctx.roundRect(-bird.radius * 0.3, -bird.radius * 0.08, bird.radius * 0.55, bird.radius * 0.16, 3);
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
     
-    // Beak
-    const beakGradient = ctx.createLinearGradient(bird.radius * 0.4, 0, bird.radius * 1.1, bird.radius * 0.2);
-    beakGradient.addColorStop(0, '#ffc107');
-    beakGradient.addColorStop(1, '#ff9800');
+    // Right eyebrow - angled down towards left (center)
+    ctx.save();
+    ctx.translate(bird.radius * 0.25, -bird.radius * 0.35);
+    ctx.rotate(-0.5); // Negative angle - slopes down to left
+    ctx.beginPath();
+    ctx.roundRect(-bird.radius * 0.25, -bird.radius * 0.08, bird.radius * 0.55, bird.radius * 0.16, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    
+    // Beak - more aggressive shape
+    const beakGradient = ctx.createLinearGradient(bird.radius * 0.3, bird.radius * 0.1, bird.radius * 1.1, bird.radius * 0.25);
+    beakGradient.addColorStop(0, '#ffca28');
+    beakGradient.addColorStop(0.5, '#ffa000');
+    beakGradient.addColorStop(1, '#ff6f00');
     ctx.fillStyle = beakGradient;
+    
+    // Upper beak
     ctx.beginPath();
-    ctx.moveTo(bird.radius * 0.48, bird.radius * 0.02);
-    ctx.lineTo(bird.radius * 1.05, bird.radius * 0.22);
-    ctx.lineTo(bird.radius * 0.48, bird.radius * 0.4);
+    ctx.moveTo(bird.radius * 0.35, bird.radius * 0.12);
+    ctx.lineTo(bird.radius * 1.1, bird.radius * 0.22);
+    ctx.lineTo(bird.radius * 0.4, bird.radius * 0.28);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#e65100';
     ctx.lineWidth = 1.5;
+    ctx.stroke();
+    
+    // Lower beak - smaller
+    ctx.fillStyle = '#ff8f00';
+    ctx.beginPath();
+    ctx.moveTo(bird.radius * 0.4, bird.radius * 0.3);
+    ctx.lineTo(bird.radius * 0.85, bird.radius * 0.32);
+    ctx.lineTo(bird.radius * 0.4, bird.radius * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#e65100';
     ctx.stroke();
     
     // Tail feathers
