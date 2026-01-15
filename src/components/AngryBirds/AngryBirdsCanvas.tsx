@@ -3,6 +3,7 @@ import {
   AngryBird, Pig, Block, Egg, Explosion, Level,
   BIRD_PROPERTIES, BLOCK_PROPERTIES, BirdType
 } from './types';
+import { useAngryBirdsAudio } from '@/hooks/useAngryBirdsAudio';
 
 // Import game assets
 import birdRedImg from '@/assets/angry-birds/bird-red.png';
@@ -67,6 +68,9 @@ interface ScreenShake {
 export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
+  
+  // Audio hooks
+  const audio = useAngryBirdsAudio();
   
   const [gameStatus, setGameStatus] = useState<'waiting' | 'aiming' | 'flying' | 'finished'>('waiting');
   const [score, setScore] = useState(0);
@@ -390,8 +394,9 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       isDraggingRef.current = true;
       dragCurrentRef.current = { x: bird.x, y: bird.y };
       setGameStatus('aiming');
+      audio.playStretch();
     }
-  }, [gameStatus]);
+  }, [gameStatus, audio]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDraggingRef.current) return;
@@ -450,6 +455,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     
     // Launch effect
     addScreenShake(3, 0.15);
+    audio.playLaunch();
+    
     for (let i = 0; i < 10; i++) {
       particlesRef.current.push({
         x: SLINGSHOT_X,
@@ -470,7 +477,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     }, 300);
     
     setGameStatus('flying');
-  }, []);
+  }, [audio]);
 
   const handleClick = useCallback(() => {
     if (gameStatus !== 'flying' || !currentBirdRef.current) return;
@@ -486,6 +493,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       bird.velocityY *= 0.4;
       bird.specialUsed = true;
       addScreenShake(4, 0.2);
+      audio.playSpecialAbility('yellow');
       
       for (let i = 0; i < 20; i++) {
         particlesRef.current.push({
@@ -505,6 +513,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       createExplosion(bird.x, bird.y, 160);
       bird.specialUsed = true;
       bird.hasLanded = true;
+      audio.playSpecialAbility('black');
+      audio.playExplosion();
       
       [...pigsRef.current, ...blocksRef.current].forEach(obj => {
         const dist = Math.sqrt((obj.x - bird.x) ** 2 + (obj.y - bird.y) ** 2);
@@ -527,8 +537,9 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       bird.velocityY = -15;
       bird.specialUsed = true;
       addScreenShake(2, 0.1);
+      audio.playSpecialAbility('white');
     }
-  }, [gameStatus]);
+  }, [gameStatus, audio]);
 
   // Touch support
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -855,6 +866,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
             createDebris(bird.x, bird.y, BLOCK_PROPERTIES[block.type].color, speed / 10);
             createImpactStars(bird.x, bird.y);
             addScreenShake(speed / 3, 0.12);
+            audio.playBlockHit(block.type as 'wood' | 'stone' | 'glass' | 'iron');
             
             // Realistic collision response
             const angle = Math.atan2(bird.y - block.y, bird.x - block.x);
@@ -888,6 +900,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
           
           createImpactStars((bird.x + pig.x) / 2, (bird.y + pig.y) / 2);
           addScreenShake(speed / 2.5, 0.15);
+          audio.playPigHit();
           
           // Collision response
           const angle = Math.atan2(pig.y - bird.y, pig.x - bird.x);
@@ -908,6 +921,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         setScore(s => s + 100);
         createDebris(block.x, block.y, BLOCK_PROPERTIES[block.type].color, 1.5);
         addScreenShake(4, 0.1);
+        audio.playBlockDestroy(block.type as 'wood' | 'stone' | 'glass' | 'iron');
         return false;
       }
       
@@ -1048,6 +1062,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       if (pig.health <= 0) {
         setScore(s => s + 500);
         createExplosion(pig.x, pig.y, 70);
+        audio.playPigDeath();
         return false;
       }
       
@@ -1170,6 +1185,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         if (dist < egg.radius && !hitSomething) {
           hitSomething = true;
           createExplosion(egg.x, egg.y, 100);
+          audio.playExplosion();
           
           // Damage nearby objects
           [...pigsRef.current, ...blocksRef.current].forEach(obj => {
@@ -1192,6 +1208,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         if (dist < egg.radius + pig.radius && !hitSomething) {
           hitSomething = true;
           createExplosion(egg.x, egg.y, 100);
+          audio.playExplosion();
           
           // Direct hit damage
           pig.health -= 3;
@@ -1216,6 +1233,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       // Ground collision
       if (egg.y + egg.radius > groundY) {
         createExplosion(egg.x, groundY - 10, 120);
+        audio.playExplosion();
         
         [...pigsRef.current, ...blocksRef.current].forEach(obj => {
           const dist = Math.sqrt((obj.x - egg.x) ** 2 + (obj.y - egg.y) ** 2);
@@ -1321,6 +1339,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       const starsEarned = finalScore >= level.stars[2] ? 3 : finalScore >= level.stars[1] ? 2 : finalScore >= level.stars[0] ? 1 : 0;
       
       setScore(finalScore);
+      audio.playVictory();
       setTimeout(() => {
         onLevelComplete(finalScore, Math.max(1, starsEarned));
       }, 1000);
@@ -1329,11 +1348,12 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     
     if (gameStatus === 'finished' && pigsRef.current.length > 0) {
       gameEndedRef.current = true;
+      audio.playDefeat();
       setTimeout(() => {
         onLevelComplete(score, 0);
       }, 1000);
     }
-  }, [score, currentBirdIndex, level.stars, gameStatus, onLevelComplete]);
+  }, [score, currentBirdIndex, level.stars, gameStatus, onLevelComplete, audio]);
 
   // Enhanced Drawing functions
   const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
