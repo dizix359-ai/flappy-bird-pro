@@ -72,6 +72,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const [score, setScore] = useState(0);
   const [currentBirdIndex, setCurrentBirdIndex] = useState(0);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   
   const birdsRef = useRef<AngryBird[]>([]);
   const pigsRef = useRef<Pig[]>([]);
@@ -193,6 +194,68 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     setCurrentBirdIndex(0);
     setScore(0);
     setGameStatus('waiting');
+    
+    if (birdsRef.current.length > 0) {
+      const firstBird = birdsRef.current[0];
+      currentBirdRef.current = {
+        ...firstBird,
+        x: SLINGSHOT_X,
+        y: SLINGSHOT_Y,
+      };
+    }
+  }, [level]);
+
+  // Handle restart level
+  const handleRestart = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const groundY = canvas.height - GROUND_HEIGHT;
+    
+    birdsRef.current = level.birds.map((type, index) => ({
+      id: `bird-${index}`,
+      type,
+      x: 40 + index * 50,
+      y: groundY - BIRD_PROPERTIES[type].radius - 8,
+      radius: BIRD_PROPERTIES[type].radius,
+      velocityX: 0,
+      velocityY: 0,
+      rotation: 0,
+      isFlying: false,
+      hasLanded: false,
+      specialUsed: false,
+    }));
+
+    pigsRef.current = level.pigs.map((pig, index) => ({
+      ...pig,
+      id: `pig-${index}`,
+      y: pig.y + 20,
+      velocityX: 0,
+      velocityY: 0,
+    }));
+
+    blocksRef.current = level.blocks.map((block, index) => ({
+      ...block,
+      id: `block-${index}`,
+      y: block.y + 20,
+      velocityX: 0,
+      velocityY: 0,
+    }));
+
+    eggsRef.current = [];
+    explosionsRef.current = [];
+    particlesRef.current = [];
+    birdTransitionRef.current = false;
+    gameEndedRef.current = false;
+    timeRef.current = 0;
+    flightTimeRef.current = 0;
+    launchTimeRef.current = 0;
+    justLaunchedRef.current = false;
+    lastCollisionTimeRef.current = 0;
+    setCurrentBirdIndex(0);
+    setScore(0);
+    setGameStatus('waiting');
+    setIsPaused(false);
     
     if (birdsRef.current.length > 0) {
       const firstBird = birdsRef.current[0];
@@ -510,6 +573,12 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     if (!ctx) return;
 
     const gameLoop = () => {
+      // Skip updates when paused
+      if (isPaused) {
+        animationRef.current = requestAnimationFrame(gameLoop);
+        return;
+      }
+      
       const deltaTime = 0.016;
       timeRef.current += deltaTime;
       
@@ -604,7 +673,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [currentBirdIndex, gameStatus, score, level]);
+  }, [currentBirdIndex, gameStatus, score, level, isPaused]);
 
   const updateParticles = (deltaTime: number) => {
     particlesRef.current = particlesRef.current.filter(p => {
@@ -2399,26 +2468,90 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         onTouchEnd={handleTouchEnd}
       />
       
-      {/* Enhanced Back button */}
-      <button
-        onClick={onBackToMenu}
-        className="absolute top-6 left-6 bg-black/70 hover:bg-black/85 backdrop-blur-xl px-7 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-3 border border-white/25 shadow-xl hover:scale-105"
-      >
-        <span className="text-xl">←</span>
-        <span>رجوع</span>
-      </button>
+      {/* Control Buttons */}
+      <div className="absolute top-6 left-6 flex gap-3">
+        {/* Back button */}
+        <button
+          onClick={onBackToMenu}
+          className="bg-black/70 hover:bg-black/85 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+        >
+          <span className="text-xl">←</span>
+          <span>رجوع</span>
+        </button>
+        
+        {/* Restart button */}
+        <button
+          onClick={handleRestart}
+          className="bg-amber-600/80 hover:bg-amber-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+        >
+          <span className="text-xl">🔄</span>
+          <span>إعادة</span>
+        </button>
+        
+        {/* Pause button */}
+        <button
+          onClick={() => setIsPaused(true)}
+          className="bg-blue-600/80 hover:bg-blue-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+        >
+          <span className="text-xl">⏸️</span>
+          <span>إيقاف</span>
+        </button>
+      </div>
       
       {/* Instructions */}
-      {gameStatus === 'waiting' && (
+      {gameStatus === 'waiting' && !isPaused && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-black/75 to-black/60 backdrop-blur-xl px-12 py-6 rounded-3xl text-white text-center border border-white/25 shadow-2xl">
           <span className="text-xl font-semibold">🎯 اسحب الطائر للخلف ثم أفلت للإطلاق!</span>
         </div>
       )}
       
       {/* Special ability hint */}
-      {gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && (
+      {gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && !isPaused && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 backdrop-blur-xl px-10 py-5 rounded-2xl text-white font-bold animate-pulse shadow-2xl border border-white/35">
           ⚡ اضغط لتفعيل القدرة الخاصة! ⚡
+        </div>
+      )}
+      
+      {/* Pause Screen */}
+      {isPaused && gameStatus !== 'finished' && (
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center rounded-3xl z-50">
+          <div className="text-center text-white p-12">
+            <h2 className="text-6xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 drop-shadow-lg">
+              ⏸️ إيقاف مؤقت ⏸️
+            </h2>
+            
+            <div className="flex flex-col gap-4">
+              {/* Resume button */}
+              <button
+                onClick={() => setIsPaused(false)}
+                className="bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+              >
+                ▶️ متابعة اللعب
+              </button>
+              
+              {/* Restart button */}
+              <button
+                onClick={() => {
+                  setIsPaused(false);
+                  handleRestart();
+                }}
+                className="bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+              >
+                🔄 إعادة المستوى
+              </button>
+              
+              {/* Back to menu button */}
+              <button
+                onClick={() => {
+                  setIsPaused(false);
+                  onBackToMenu();
+                }}
+                className="bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+              >
+                ← العودة للقائمة
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
@@ -2441,12 +2574,20 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
                 <p className="text-2xl mb-10 text-white/75">لا تستسلم، حاول مرة أخرى!</p>
               </>
             )}
-            <button
-              onClick={onBackToMenu}
-              className="bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
-            >
-              العودة للقائمة
-            </button>
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={handleRestart}
+                className="bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+              >
+                🔄 إعادة المستوى
+              </button>
+              <button
+                onClick={onBackToMenu}
+                className="bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+              >
+                العودة للقائمة
+              </button>
+            </div>
           </div>
         </div>
       )}
