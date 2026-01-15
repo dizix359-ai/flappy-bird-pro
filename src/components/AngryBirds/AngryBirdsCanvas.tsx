@@ -768,61 +768,131 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         return false;
       }
       
-      // Apply gravity
-      block.velocityY += GRAVITY * 0.7 * scaledDelta;
+      // Check if block is supported (has something below it or is on ground)
+      const isOnGround = block.y + block.height / 2 >= groundY - 2;
+      let isSupported = isOnGround;
+      
+      if (!isSupported) {
+        // Check if there's a block below supporting this one
+        blocksRef.current.forEach(other => {
+          if (other.id !== block.id) {
+            const horizontalOverlap = Math.abs(block.x - other.x) < (block.width + other.width) / 2 - 5;
+            const verticallyBelow = other.y > block.y && 
+              other.y - other.height / 2 <= block.y + block.height / 2 + 5;
+            if (horizontalOverlap && verticallyBelow) {
+              isSupported = true;
+            }
+          }
+        });
+      }
+      
+      // Apply gravity (always, but stronger if not supported)
+      const gravityMultiplier = isSupported ? 0.3 : 0.8;
+      block.velocityY += GRAVITY * gravityMultiplier * scaledDelta;
       
       // Apply air resistance
-      block.velocityX *= Math.pow(0.995, scaledDelta);
-      block.velocityY *= Math.pow(0.998, scaledDelta);
+      block.velocityX *= Math.pow(0.99, scaledDelta);
+      block.velocityY *= Math.pow(0.995, scaledDelta);
+      
+      // Apply rotational damping (NEW!)
+      block.rotation *= Math.pow(0.96, scaledDelta);
+      
+      // Clamp small velocities to zero for stability
+      if (Math.abs(block.velocityX) < 0.1) block.velocityX = 0;
+      if (Math.abs(block.velocityY) < 0.1 && isOnGround) block.velocityY = 0;
+      if (Math.abs(block.rotation) < 0.01) block.rotation = 0;
       
       // Update position
       block.x += block.velocityX * scaledDelta;
       block.y += block.velocityY * scaledDelta;
-      block.rotation += block.velocityX * 0.002 * scaledDelta;
+      
+      // Rotation based on horizontal velocity with damping
+      if (Math.abs(block.velocityX) > 1) {
+        block.rotation += block.velocityX * 0.003 * scaledDelta;
+      }
       
       // Ground collision with bounce
       if (block.y + block.height / 2 > groundY) {
         block.y = groundY - block.height / 2;
         
         if (Math.abs(block.velocityY) > MIN_BOUNCE_VELOCITY) {
-          block.velocityY = -block.velocityY * 0.3;
-          block.velocityX *= 0.7;
+          const impactSpeed = Math.abs(block.velocityY);
+          block.velocityY = -block.velocityY * 0.25;
+          block.velocityX *= 0.65;
+          block.rotation *= 0.5; // Reduce rotation on ground impact
           
           // Fall damage
-          if (Math.abs(block.velocityY) > 8) {
+          if (impactSpeed > 8) {
             block.health -= 1;
             createDebris(block.x, groundY, BLOCK_PROPERTIES[block.type].color, 0.5);
+            addScreenShake(impactSpeed / 4, 0.1);
           }
         } else {
           block.velocityY = 0;
+          block.rotation *= 0.8; // Slowly stabilize rotation
         }
+        
+        // Ground friction
+        block.velocityX *= 0.85;
       }
       
       // Wall collision
       if (block.x < block.width / 2) {
         block.x = block.width / 2;
         block.velocityX = -block.velocityX * 0.4;
+        block.rotation -= 0.1;
       }
       if (block.x > canvasRef.current!.width - block.width / 2) {
         block.x = canvasRef.current!.width - block.width / 2;
         block.velocityX = -block.velocityX * 0.4;
+        block.rotation += 0.1;
       }
       
-      // Block-to-block collisions
+      // Block-to-block collisions with improved physics
       blocksRef.current.forEach(other => {
         if (other.id !== block.id) {
           if (checkBlockBlockCollision(block, other)) {
             const angle = Math.atan2(block.y - other.y, block.x - other.x);
-            const push = 2;
-            block.x += Math.cos(angle) * push;
-            block.y += Math.sin(angle) * push;
+            const overlapX = (block.width + other.width) / 2 - Math.abs(block.x - other.x);
+            const overlapY = (block.height + other.height) / 2 - Math.abs(block.y - other.y);
             
+            // Separate based on smallest overlap
+            if (overlapX < overlapY) {
+              const push = overlapX * 0.5;
+              block.x += Math.sign(block.x - other.x) * push;
+              other.x -= Math.sign(block.x - other.x) * push;
+            } else {
+              const push = overlapY * 0.5;
+              block.y += Math.sign(block.y - other.y) * push;
+              other.y -= Math.sign(block.y - other.y) * push;
+            }
+            
+            // Calculate relative velocity
+            const relVelX = block.velocityX - other.velocityX;
+            const relVelY = block.velocityY - other.velocityY;
+            const relSpeed = Math.sqrt(relVelX ** 2 + relVelY ** 2);
+            
+            // Exchange momentum with restitution
+            const restitution = 0.6;
             const tempVx = block.velocityX;
             const tempVy = block.velocityY;
-            block.velocityX = other.velocityX * 0.8;
-            block.velocityY = other.velocityY * 0.8;
-            other.velocityX = tempVx * 0.8;
-            other.velocityY = tempVy * 0.8;
+            block.velocityX = other.velocityX * restitution;
+            block.velocityY = other.velocityY * restitution;
+            other.velocityX = tempVx * restitution;
+            other.velocityY = tempVy * restitution;
+            
+            // Add some rotation from collision
+            block.rotation += relVelX * 0.01;
+            other.rotation -= relVelX * 0.01;
+            
+            // Collision damage if fast enough
+            if (relSpeed > 10) {
+              const damage = Math.ceil(relSpeed / 15);
+              block.health -= damage;
+              other.health -= damage;
+              createDebris((block.x + other.x) / 2, (block.y + other.y) / 2, 
+                BLOCK_PROPERTIES[block.type].color, 0.3);
+            }
           }
         }
       });
@@ -855,11 +925,65 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
           // Fall damage
           if (Math.abs(pig.velocityY) > 10) {
             pig.health -= 1;
+            createDebris(pig.x, groundY, '#7cb342', 0.5);
           }
         } else {
           pig.velocityY = 0;
         }
       }
+      
+      // Wall collision
+      if (pig.x < pig.radius) {
+        pig.x = pig.radius;
+        pig.velocityX = -pig.velocityX * 0.4;
+      }
+      if (pig.x > canvasRef.current!.width - pig.radius) {
+        pig.x = canvasRef.current!.width - pig.radius;
+        pig.velocityX = -pig.velocityX * 0.4;
+      }
+      
+      // Pig-to-Pig collision (NEW!)
+      pigsRef.current.forEach(otherPig => {
+        if (otherPig.id !== pig.id) {
+          const dist = Math.sqrt((pig.x - otherPig.x) ** 2 + (pig.y - otherPig.y) ** 2);
+          const minDist = pig.radius + otherPig.radius;
+          
+          if (dist < minDist && dist > 0) {
+            // Calculate collision response
+            const angle = Math.atan2(pig.y - otherPig.y, pig.x - otherPig.x);
+            const overlap = minDist - dist;
+            
+            // Separate the pigs
+            pig.x += Math.cos(angle) * overlap * 0.5;
+            pig.y += Math.sin(angle) * overlap * 0.5;
+            otherPig.x -= Math.cos(angle) * overlap * 0.5;
+            otherPig.y -= Math.sin(angle) * overlap * 0.5;
+            
+            // Calculate relative velocity
+            const relVelX = pig.velocityX - otherPig.velocityX;
+            const relVelY = pig.velocityY - otherPig.velocityY;
+            const relSpeed = Math.sqrt(relVelX ** 2 + relVelY ** 2);
+            
+            // Exchange velocities with damping
+            const restitution = 0.5;
+            const tempVx = pig.velocityX;
+            const tempVy = pig.velocityY;
+            pig.velocityX = otherPig.velocityX * restitution;
+            pig.velocityY = otherPig.velocityY * restitution;
+            otherPig.velocityX = tempVx * restitution;
+            otherPig.velocityY = tempVy * restitution;
+            
+            // Collision damage if fast enough
+            if (relSpeed > 8) {
+              const damage = Math.ceil(relSpeed / 10);
+              pig.health -= damage;
+              otherPig.health -= damage;
+              createImpactStars((pig.x + otherPig.x) / 2, (pig.y + otherPig.y) / 2);
+              addScreenShake(relSpeed / 5, 0.1);
+            }
+          }
+        }
+      });
       
       // Block collision
       blocksRef.current.forEach(block => {
@@ -872,6 +996,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
           if (relSpeed > 5) {
             pig.health -= Math.ceil(relSpeed / 5);
             block.health -= Math.ceil(relSpeed / 8);
+            createImpactStars(pig.x, pig.y);
           }
           
           const angle = Math.atan2(pig.y - block.y, pig.x - block.x);
@@ -886,12 +1011,66 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       return true;
     });
     
-    // Update eggs
+    // Update eggs with block collision (IMPROVED!)
     eggsRef.current = eggsRef.current.filter(egg => {
       egg.velocityY += GRAVITY * 1.2;
       egg.x += egg.velocityX * scaledDelta;
       egg.y += egg.velocityY * scaledDelta;
       
+      // Check collision with blocks in the air (NEW!)
+      let hitSomething = false;
+      blocksRef.current.forEach(block => {
+        const closestX = Math.max(block.x - block.width / 2, Math.min(egg.x, block.x + block.width / 2));
+        const closestY = Math.max(block.y - block.height / 2, Math.min(egg.y, block.y + block.height / 2));
+        const dist = Math.sqrt((egg.x - closestX) ** 2 + (egg.y - closestY) ** 2);
+        
+        if (dist < egg.radius && !hitSomething) {
+          hitSomething = true;
+          createExplosion(egg.x, egg.y, 100);
+          
+          // Damage nearby objects
+          [...pigsRef.current, ...blocksRef.current].forEach(obj => {
+            const objDist = Math.sqrt((obj.x - egg.x) ** 2 + (obj.y - egg.y) ** 2);
+            if (objDist < 120) {
+              const force = (120 - objDist) / 120;
+              obj.health -= Math.ceil(force * 4);
+              obj.velocityY -= force * 15;
+              obj.velocityX += (obj.x - egg.x) / (objDist || 1) * force * 10;
+            }
+          });
+        }
+      });
+      
+      if (hitSomething) return false;
+      
+      // Check collision with pigs in the air (NEW!)
+      pigsRef.current.forEach(pig => {
+        const dist = Math.sqrt((egg.x - pig.x) ** 2 + (egg.y - pig.y) ** 2);
+        if (dist < egg.radius + pig.radius && !hitSomething) {
+          hitSomething = true;
+          createExplosion(egg.x, egg.y, 100);
+          
+          // Direct hit damage
+          pig.health -= 3;
+          pig.velocityY -= 10;
+          pig.velocityX += (pig.x - egg.x) / (dist || 1) * 8;
+          
+          // Damage nearby objects
+          [...pigsRef.current, ...blocksRef.current].forEach(obj => {
+            const objDist = Math.sqrt((obj.x - egg.x) ** 2 + (obj.y - egg.y) ** 2);
+            if (objDist < 100 && obj !== pig) {
+              const force = (100 - objDist) / 100;
+              obj.health -= Math.ceil(force * 3);
+              obj.velocityY -= force * 12;
+              obj.velocityX += (obj.x - egg.x) / (objDist || 1) * force * 8;
+            }
+          });
+        }
+      });
+      
+      if (hitSomething) return false;
+      
+      // Ground collision
       if (egg.y + egg.radius > groundY) {
         createExplosion(egg.x, groundY - 10, 120);
         
@@ -901,7 +1080,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
             const force = (140 - dist) / 140;
             obj.health -= Math.ceil(force * 5);
             obj.velocityY -= force * 18;
-            obj.velocityX += (obj.x - egg.x) / dist * force * 12;
+            obj.velocityX += (obj.x - egg.x) / (dist || 1) * force * 12;
           }
         });
         
