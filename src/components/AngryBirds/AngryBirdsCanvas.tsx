@@ -1,13 +1,35 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { 
   AngryBird, Pig, Block, Egg, Explosion, Level,
-  BIRD_PROPERTIES, BLOCK_PROPERTIES
+  BIRD_PROPERTIES, BLOCK_PROPERTIES, BirdType
 } from './types';
+
+// Import game assets
+import birdRedImg from '@/assets/angry-birds/bird-red.png';
+import birdYellowImg from '@/assets/angry-birds/bird-yellow.png';
+import birdBlackImg from '@/assets/angry-birds/bird-black.png';
+import birdWhiteImg from '@/assets/angry-birds/bird-white.png';
+import pigImg from '@/assets/angry-birds/pig.png';
+import blockWoodImg from '@/assets/angry-birds/block-wood.png';
+import blockStoneImg from '@/assets/angry-birds/block-stone.png';
+import blockGlassImg from '@/assets/angry-birds/block-glass.png';
+import blockIronImg from '@/assets/angry-birds/block-iron.png';
+import slingshotImg from '@/assets/angry-birds/slingshot.png';
+import backgroundImg from '@/assets/angry-birds/background.png';
 
 interface GameCanvasProps {
   level: Level;
   onLevelComplete: (score: number, starsEarned: number) => void;
   onBackToMenu: () => void;
+}
+
+interface GameAssets {
+  birds: Record<BirdType, HTMLImageElement>;
+  pig: HTMLImageElement;
+  blocks: Record<string, HTMLImageElement>;
+  slingshot: HTMLImageElement;
+  background: HTMLImageElement;
+  loaded: boolean;
 }
 
 // Enhanced Physics Constants
@@ -49,6 +71,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const [gameStatus, setGameStatus] = useState<'waiting' | 'aiming' | 'flying' | 'finished'>('waiting');
   const [score, setScore] = useState(0);
   const [currentBirdIndex, setCurrentBirdIndex] = useState(0);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
   
   const birdsRef = useRef<AngryBird[]>([]);
   const pigsRef = useRef<Pig[]>([]);
@@ -58,6 +81,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const currentBirdRef = useRef<AngryBird | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const screenShakeRef = useRef<ScreenShake>({ intensity: 0, duration: 0, time: 0 });
+  const assetsRef = useRef<GameAssets | null>(null);
   
   const isDraggingRef = useRef(false);
   const dragCurrentRef = useRef({ x: SLINGSHOT_X, y: SLINGSHOT_Y });
@@ -68,6 +92,56 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const launchTimeRef = useRef(0);
   const justLaunchedRef = useRef(false);
   const lastCollisionTimeRef = useRef(0);
+
+  // Load game assets
+  useEffect(() => {
+    const loadImage = (src: string): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
+    const loadAssets = async () => {
+      try {
+        const [
+          birdRed, birdYellow, birdBlack, birdWhite,
+          pig, blockWood, blockStone, blockGlass, blockIron,
+          slingshot, background
+        ] = await Promise.all([
+          loadImage(birdRedImg),
+          loadImage(birdYellowImg),
+          loadImage(birdBlackImg),
+          loadImage(birdWhiteImg),
+          loadImage(pigImg),
+          loadImage(blockWoodImg),
+          loadImage(blockStoneImg),
+          loadImage(blockGlassImg),
+          loadImage(blockIronImg),
+          loadImage(slingshotImg),
+          loadImage(backgroundImg),
+        ]);
+
+        assetsRef.current = {
+          birds: { red: birdRed, yellow: birdYellow, black: birdBlack, white: birdWhite },
+          pig,
+          blocks: { wood: blockWood, stone: blockStone, glass: blockGlass, iron: blockIron },
+          slingshot,
+          background,
+          loaded: true,
+        };
+        setAssetsLoaded(true);
+      } catch (err) {
+        console.error('Failed to load assets:', err);
+        // Continue without sprite assets - use fallback drawing
+        setAssetsLoaded(true);
+      }
+    };
+
+    loadAssets();
+  }, []);
 
   // Initialize level
   useEffect(() => {
@@ -1194,58 +1268,17 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
 
   // Enhanced Drawing functions
   const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    // Animated stars
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    for (let i = 0; i < 60; i++) {
-      const x = (i * 137 + timeRef.current * 3) % width;
-      const y = (i * 89) % (height * 0.45);
-      const twinkle = Math.sin(timeRef.current * 3 + i * 0.5) * 0.5 + 0.5;
-      const size = (1.5 + Math.sin(timeRef.current * 2 + i) * 0.8) * twinkle;
-      ctx.globalAlpha = 0.3 + twinkle * 0.7;
-      ctx.beginPath();
-      ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fill();
+    // Use background image if loaded
+    if (assetsRef.current?.background) {
+      ctx.drawImage(assetsRef.current.background, 0, 0, width, height - GROUND_HEIGHT + 20);
+    } else {
+      // Fallback gradient
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
+      skyGradient.addColorStop(0, '#87CEEB');
+      skyGradient.addColorStop(1, '#E0F6FF');
+      ctx.fillStyle = skyGradient;
+      ctx.fillRect(0, 0, width, height);
     }
-    ctx.globalAlpha = 1;
-    
-    // Distant nebula effect
-    const nebulaGradient = ctx.createRadialGradient(width * 0.7, height * 0.2, 0, width * 0.7, height * 0.2, 200);
-    nebulaGradient.addColorStop(0, 'rgba(156, 39, 176, 0.15)');
-    nebulaGradient.addColorStop(0.5, 'rgba(103, 58, 183, 0.08)');
-    nebulaGradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = nebulaGradient;
-    ctx.fillRect(0, 0, width, height);
-    
-    // Far mountains with parallax
-    const parallax1 = Math.sin(timeRef.current * 0.1) * 5;
-    ctx.fillStyle = '#1a2744';
-    ctx.beginPath();
-    ctx.moveTo(0, height - GROUND_HEIGHT - 20);
-    for (let x = 0; x <= width; x += 50) {
-      const mountainHeight = 80 + Math.sin(x * 0.015 + parallax1) * 40 + Math.sin(x * 0.008) * 30;
-      ctx.lineTo(x, height - GROUND_HEIGHT - mountainHeight);
-    }
-    ctx.lineTo(width, height);
-    ctx.lineTo(0, height);
-    ctx.closePath();
-    ctx.fill();
-    
-    // Near mountains
-    const parallax2 = Math.sin(timeRef.current * 0.15) * 3;
-    const mountainGradient = ctx.createLinearGradient(0, height - GROUND_HEIGHT - 100, 0, height - GROUND_HEIGHT);
-    mountainGradient.addColorStop(0, '#2d3a52');
-    mountainGradient.addColorStop(1, '#3d4a62');
-    ctx.fillStyle = mountainGradient;
-    ctx.beginPath();
-    ctx.moveTo(0, height - GROUND_HEIGHT);
-    for (let x = 0; x <= width; x += 40) {
-      const mountainHeight = 60 + Math.sin(x * 0.02 + parallax2 + 2) * 35 + Math.cos(x * 0.012) * 25;
-      ctx.lineTo(x, height - GROUND_HEIGHT - mountainHeight);
-    }
-    ctx.lineTo(width, height);
-    ctx.lineTo(0, height);
-    ctx.closePath();
-    ctx.fill();
     
     // Ground with rich gradient
     const groundGradient = ctx.createLinearGradient(0, height - GROUND_HEIGHT, 0, height);
@@ -1273,75 +1306,6 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       );
       ctx.stroke();
     }
-    
-    // Atmospheric clouds
-    const clouds = [
-      { x: 100, y: 45, scale: 1.1, speed: 0.2 },
-      { x: 350, y: 30, scale: 0.9, speed: 0.15 },
-      { x: 600, y: 55, scale: 1.2, speed: 0.25 },
-      { x: 850, y: 40, scale: 0.85, speed: 0.18 },
-    ];
-    
-    clouds.forEach(cloud => {
-      const x = (cloud.x + timeRef.current * 15 * cloud.speed) % (width + 150) - 75;
-      const y = cloud.y + Math.sin(timeRef.current * 0.5 + cloud.x) * 5;
-      
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.beginPath();
-      ctx.arc(x, y, 30 * cloud.scale, 0, Math.PI * 2);
-      ctx.arc(x + 28 * cloud.scale, y - 12 * cloud.scale, 24 * cloud.scale, 0, Math.PI * 2);
-      ctx.arc(x + 55 * cloud.scale, y, 30 * cloud.scale, 0, Math.PI * 2);
-      ctx.arc(x + 28 * cloud.scale, y + 10 * cloud.scale, 22 * cloud.scale, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Cloud shadow
-      ctx.fillStyle = 'rgba(200, 210, 255, 0.3)';
-      ctx.beginPath();
-      ctx.arc(x + 3, y + 5, 28 * cloud.scale, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    
-    // Sun with animated rays
-    const sunX = width - 85;
-    const sunY = 75;
-    
-    // Animated sun rays
-    ctx.save();
-    ctx.translate(sunX, sunY);
-    ctx.rotate(timeRef.current * 0.1);
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 * i) / 12;
-      const rayLength = 60 + Math.sin(timeRef.current * 2 + i) * 15;
-      ctx.strokeStyle = 'rgba(255, 220, 100, 0.3)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * 45, Math.sin(angle) * 45);
-      ctx.lineTo(Math.cos(angle) * rayLength, Math.sin(angle) * rayLength);
-      ctx.stroke();
-    }
-    ctx.restore();
-    
-    // Sun glow
-    const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 90);
-    sunGlow.addColorStop(0, 'rgba(255, 230, 150, 0.9)');
-    sunGlow.addColorStop(0.3, 'rgba(255, 200, 80, 0.5)');
-    sunGlow.addColorStop(0.6, 'rgba(255, 150, 50, 0.2)');
-    sunGlow.addColorStop(1, 'transparent');
-    ctx.fillStyle = sunGlow;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 90, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Sun core with gradient
-    const sunCore = ctx.createRadialGradient(sunX - 12, sunY - 12, 0, sunX, sunY, 42);
-    sunCore.addColorStop(0, '#fffef0');
-    sunCore.addColorStop(0.4, '#ffe082');
-    sunCore.addColorStop(0.8, '#ffc107');
-    sunCore.addColorStop(1, '#ff9800');
-    ctx.fillStyle = sunCore;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 42, 0, Math.PI * 2);
-    ctx.fill();
   };
 
   const drawSlingshotBack = (ctx: CanvasRenderingContext2D) => {
