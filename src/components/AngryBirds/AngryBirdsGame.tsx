@@ -110,8 +110,18 @@ export const AngryBirdsGame = () => {
     }
   };
 
+  // Detect mobile
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center p-4 overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden relative">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Stars */}
@@ -165,10 +175,10 @@ export const AngryBirdsGame = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-5xl z-10"
+            className="w-full max-w-5xl z-10 px-2"
           >
             {/* Header */}
-            <div className="text-center mb-8">
+            <div className="text-center mb-4 md:mb-8">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -177,7 +187,9 @@ export const AngryBirdsGame = () => {
               >
                 {/* Title glow effect */}
                 <div className="absolute inset-0 blur-xl bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 opacity-50" />
-                <h1 className="relative text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-400 to-red-600 drop-shadow-2xl mb-2 tracking-tight">
+                <h1 className={`relative font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-400 to-red-600 drop-shadow-2xl mb-2 tracking-tight
+                  ${isMobile ? 'text-3xl' : 'text-5xl md:text-7xl'}
+                `}>
                   الطيور الغاضبة
                 </h1>
               </motion.div>
@@ -185,7 +197,7 @@ export const AngryBirdsGame = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-white/90 text-xl font-medium mt-2"
+                className={`text-white/90 font-medium mt-2 ${isMobile ? 'text-sm' : 'text-xl'}`}
               >
                 ⚔️ ضد الخنازير الحديدية الغازية! ⚔️
               </motion.p>
@@ -197,53 +209,57 @@ export const AngryBirdsGame = () => {
                 onClick={() => navigate('/')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="mt-6 bg-white/10 hover:bg-white/20 backdrop-blur-md px-8 py-3 rounded-2xl text-white font-bold transition-all border border-white/30 shadow-lg"
+                className={`mt-4 md:mt-6 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl text-white font-bold transition-all border border-white/30 shadow-lg
+                  ${isMobile ? 'px-4 py-2 text-sm' : 'px-8 py-3'}
+                `}
               >
                 ← العودة للألعاب
               </motion.button>
             </div>
 
-            {/* Bird Types Legend */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gradient-to-br from-black/40 to-black/20 backdrop-blur-lg rounded-3xl p-6 mb-8 border border-white/10 shadow-2xl"
-            >
-              <h3 className="text-white font-bold mb-4 text-center text-lg">🐦 أنواع الطيور</h3>
-              <div className="flex flex-wrap justify-center gap-3">
-                {(['red', 'yellow', 'black', 'white'] as const).map((type, index) => (
-                  <motion.div 
-                    key={type} 
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 + index * 0.1 }}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    className="flex items-center gap-3 bg-gradient-to-r from-white/15 to-white/5 rounded-2xl px-5 py-3 border border-white/10 shadow-lg"
-                  >
-                    <div
-                      className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-2xl border-2 border-white/30"
-                      style={{ 
-                        background: `radial-gradient(circle at 30% 30%, ${BIRD_PROPERTIES[type].color}aa, ${BIRD_PROPERTIES[type].color})`,
-                        boxShadow: `0 4px 15px ${BIRD_PROPERTIES[type].color}50`
-                      }}
+            {/* Bird Types Legend - Collapsible on mobile */}
+            {!isMobile && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-black/40 to-black/20 backdrop-blur-lg rounded-3xl p-6 mb-8 border border-white/10 shadow-2xl"
+              >
+                <h3 className="text-white font-bold mb-4 text-center text-lg">🐦 أنواع الطيور</h3>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {(['red', 'yellow', 'black', 'white'] as const).map((type, index) => (
+                    <motion.div 
+                      key={type} 
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      className="flex items-center gap-3 bg-gradient-to-r from-white/15 to-white/5 rounded-2xl px-5 py-3 border border-white/10 shadow-lg"
                     >
-                      {type === 'red' && '😠'}
-                      {type === 'yellow' && '⚡'}
-                      {type === 'black' && '💣'}
-                      {type === 'white' && '🥚'}
-                    </div>
-                    <div className="text-white">
-                      <div className="font-bold text-sm">{BIRD_PROPERTIES[type].description}</div>
-                      <div className="text-white/60 text-xs">{BIRD_PROPERTIES[type].special}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+                      <div
+                        className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-2xl border-2 border-white/30"
+                        style={{ 
+                          background: `radial-gradient(circle at 30% 30%, ${BIRD_PROPERTIES[type].color}aa, ${BIRD_PROPERTIES[type].color})`,
+                          boxShadow: `0 4px 15px ${BIRD_PROPERTIES[type].color}50`
+                        }}
+                      >
+                        {type === 'red' && '😠'}
+                        {type === 'yellow' && '⚡'}
+                        {type === 'black' && '💣'}
+                        {type === 'white' && '🥚'}
+                      </div>
+                      <div className="text-white">
+                        <div className="font-bold text-sm">{BIRD_PROPERTIES[type].description}</div>
+                        <div className="text-white/60 text-xs">{BIRD_PROPERTIES[type].special}</div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* Levels Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className={`grid gap-3 md:gap-6 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-3'}`}>
               {LEVELS.map((level, index) => {
                 const isUnlocked = progress.unlockedLevels.includes(level.id);
                 const stars = progress.levelStars[level.id] || 0;
@@ -254,12 +270,13 @@ export const AngryBirdsGame = () => {
                     key={level.id}
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 + index * 0.15 }}
+                    transition={{ delay: 0.2 + index * 0.08 }}
                     whileHover={isUnlocked ? { scale: 1.03, y: -5 } : {}}
                     whileTap={isUnlocked ? { scale: 0.98 } : {}}
                     onClick={() => handleLevelSelect(level)}
                     className={`
-                      relative p-6 rounded-3xl cursor-pointer transition-all overflow-hidden
+                      relative rounded-2xl md:rounded-3xl cursor-pointer transition-all overflow-hidden
+                      ${isMobile ? 'p-3' : 'p-6'}
                       ${isUnlocked
                         ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 shadow-2xl hover:shadow-orange-500/40'
                         : 'bg-gradient-to-br from-slate-600/50 to-slate-800/50 cursor-not-allowed border border-white/10'
@@ -269,17 +286,17 @@ export const AngryBirdsGame = () => {
                     {/* Decorative elements for unlocked levels */}
                     {isUnlocked && (
                       <>
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
+                        <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-16 md:w-24 h-16 md:h-24 bg-black/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
                       </>
                     )}
                     
                     {!isUnlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-3xl">
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-2xl md:rounded-3xl">
                         <motion.span 
                           animate={{ scale: [1, 1.1, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
-                          className="text-7xl drop-shadow-lg"
+                          className={`drop-shadow-lg ${isMobile ? 'text-4xl' : 'text-7xl'}`}
                         >
                           🔒
                         </motion.span>
@@ -287,31 +304,31 @@ export const AngryBirdsGame = () => {
                     )}
                     
                     <div className={`relative ${isUnlocked ? 'text-white' : 'text-white/30'}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
+                      <div className="flex items-center justify-between mb-1 md:mb-2">
+                        <span className={`font-medium bg-white/20 rounded-full ${isMobile ? 'text-xs px-2 py-0.5' : 'text-sm px-3 py-1'}`}>
                           المستوى {level.id}
                         </span>
-                        {isUnlocked && highScore > 0 && (
+                        {isUnlocked && highScore > 0 && !isMobile && (
                           <span className="text-xs bg-black/20 px-2 py-1 rounded-full">
                             🏆 {highScore}
                           </span>
                         )}
                       </div>
                       
-                      <h3 className="text-3xl font-black mb-1">{level.nameAr}</h3>
-                      <p className="text-sm opacity-80 font-medium">{level.name}</p>
+                      <h3 className={`font-black mb-0.5 md:mb-1 ${isMobile ? 'text-lg' : 'text-3xl'}`}>{level.nameAr}</h3>
+                      {!isMobile && <p className="text-sm opacity-80 font-medium">{level.name}</p>}
                       
                       {isUnlocked && (
                         <>
                           {/* Stars */}
-                          <div className="flex gap-2 mt-4">
+                          <div className={`flex ${isMobile ? 'gap-1 mt-2' : 'gap-2 mt-4'}`}>
                             {[1, 2, 3].map(i => (
                               <motion.span
                                 key={i}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ delay: 0.5 + i * 0.1, type: "spring" }}
-                                className={`text-3xl drop-shadow-lg ${i <= stars ? '' : 'opacity-30 grayscale'}`}
+                                transition={{ delay: 0.3 + i * 0.1, type: "spring" }}
+                                className={`drop-shadow-lg ${i <= stars ? '' : 'opacity-30 grayscale'} ${isMobile ? 'text-xl' : 'text-3xl'}`}
                               >
                                 ⭐
                               </motion.span>
@@ -319,27 +336,32 @@ export const AngryBirdsGame = () => {
                           </div>
                           
                           {/* Birds preview */}
-                          <div className="flex gap-2 mt-4">
-                            {level.birds.map((type, i) => (
+                          <div className={`flex ${isMobile ? 'gap-1 mt-2' : 'gap-2 mt-4'}`}>
+                            {level.birds.slice(0, isMobile ? 4 : level.birds.length).map((type, i) => (
                               <motion.div
                                 key={i}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ delay: 0.6 + i * 0.05 }}
-                                className="w-8 h-8 rounded-full border-2 border-white/50 shadow-md"
+                                transition={{ delay: 0.4 + i * 0.05 }}
+                                className={`rounded-full border-2 border-white/50 shadow-md ${isMobile ? 'w-5 h-5' : 'w-8 h-8'}`}
                                 style={{ 
                                   background: `radial-gradient(circle at 30% 30%, ${BIRD_PROPERTIES[type].color}cc, ${BIRD_PROPERTIES[type].color})`
                                 }}
                               />
                             ))}
+                            {isMobile && level.birds.length > 4 && (
+                              <span className="text-xs text-white/70">+{level.birds.length - 4}</span>
+                            )}
                           </div>
                           
                           {/* Play button */}
                           <motion.div 
                             whileHover={{ scale: 1.05 }}
-                            className="mt-4 bg-white/20 hover:bg-white/30 rounded-2xl py-3 text-center font-bold transition-all"
+                            className={`bg-white/20 hover:bg-white/30 rounded-xl md:rounded-2xl text-center font-bold transition-all
+                              ${isMobile ? 'mt-2 py-2 text-sm' : 'mt-4 py-3'}
+                            `}
                           >
-                            ▶️ العب الآن
+                            ▶️ {isMobile ? 'العب' : 'العب الآن'}
                           </motion.div>
                         </>
                       )}
@@ -378,75 +400,83 @@ export const AngryBirdsGame = () => {
             className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50"
             onClick={handleBackToMenu}
           >
-            <motion.div
-              initial={{ scale: 0.8, y: 50, rotateX: 20 }}
-              animate={{ scale: 1, y: 0, rotateX: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              onClick={e => e.stopPropagation()}
-              className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 p-10 rounded-[2rem] text-center text-white shadow-2xl max-w-md border-4 border-white/20"
+          <motion.div
+            initial={{ scale: 0.8, y: 50, rotateX: 20 }}
+            animate={{ scale: 1, y: 0, rotateX: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            onClick={e => e.stopPropagation()}
+            className={`bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 rounded-2xl md:rounded-[2rem] text-center text-white shadow-2xl border-4 border-white/20
+              ${isMobile ? 'p-6 max-w-xs mx-4' : 'p-10 max-w-md'}
+            `}
+          >
+            <motion.h2 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", bounce: 0.6 }}
+              className={`font-black mb-4 md:mb-6 ${isMobile ? 'text-2xl' : 'text-4xl'}`}
             >
-              <motion.h2 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", bounce: 0.6 }}
-                className="text-4xl font-black mb-6"
-              >
-                {showResult.stars > 0 ? '🎉 أحسنت! 🎉' : '💪 حاول مرة أخرى!'}
-              </motion.h2>
-              
-              <div className="flex justify-center gap-3 mb-6">
-                {[1, 2, 3].map(i => (
-                  <motion.span
-                    key={i}
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: i * 0.15, type: "spring", bounce: 0.6 }}
-                    className={`text-6xl drop-shadow-lg ${i <= showResult.stars ? '' : 'opacity-30 grayscale'}`}
-                  >
-                    ⭐
-                  </motion.span>
-                ))}
-              </div>
-              
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="text-3xl font-black mb-8"
-              >
-                النتيجة: <span className="text-yellow-300">{showResult.score}</span>
-              </motion.p>
-              
-              <div className="flex gap-3 justify-center flex-wrap">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleRetry}
-                  className="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-2xl font-bold transition-all border border-white/30"
+              {showResult.stars > 0 ? '🎉 أحسنت! 🎉' : '💪 حاول مرة أخرى!'}
+            </motion.h2>
+            
+            <div className="flex justify-center gap-2 md:gap-3 mb-4 md:mb-6">
+              {[1, 2, 3].map(i => (
+                <motion.span
+                  key={i}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: i * 0.15, type: "spring", bounce: 0.6 }}
+                  className={`drop-shadow-lg ${i <= showResult.stars ? '' : 'opacity-30 grayscale'} ${isMobile ? 'text-4xl' : 'text-6xl'}`}
                 >
-                  🔄 إعادة
-                </motion.button>
-                
-                {showResult.stars > 0 && selectedLevel && selectedLevel.id < LEVELS.length && (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleNextLevel}
-                    className="bg-white text-orange-600 hover:bg-white/90 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg"
-                  >
-                    المستوى التالي ➡️
-                  </motion.button>
-                )}
-                
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleBackToMenu}
-                  className="bg-red-700 hover:bg-red-800 px-6 py-3 rounded-2xl font-bold transition-all border border-red-500/50"
-                >
-                  القائمة
-                </motion.button>
-              </div>
+                  ⭐
+                </motion.span>
+              ))}
+            </div>
+            
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className={`font-black mb-4 md:mb-8 ${isMobile ? 'text-xl' : 'text-3xl'}`}
+            >
+              النتيجة: <span className="text-yellow-300">{showResult.score}</span>
+            </motion.p>
+            
+            <div className={`flex gap-2 md:gap-3 justify-center ${isMobile ? 'flex-col' : 'flex-wrap'}`}>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRetry}
+              className={`bg-white/20 hover:bg-white/30 rounded-xl md:rounded-2xl font-bold transition-all border border-white/30
+                ${isMobile ? 'px-4 py-2.5 text-sm w-full' : 'px-6 py-3'}
+              `}
+            >
+              🔄 إعادة
+            </motion.button>
+            
+            {showResult.stars > 0 && selectedLevel && selectedLevel.id < LEVELS.length && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleNextLevel}
+                className={`bg-white text-orange-600 hover:bg-white/90 rounded-xl md:rounded-2xl font-bold transition-all shadow-lg
+                  ${isMobile ? 'px-4 py-2.5 text-sm w-full' : 'px-6 py-3'}
+                `}
+              >
+                المستوى التالي ➡️
+              </motion.button>
+            )}
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleBackToMenu}
+              className={`bg-red-700 hover:bg-red-800 rounded-xl md:rounded-2xl font-bold transition-all border border-red-500/50
+                ${isMobile ? 'px-4 py-2.5 text-sm w-full' : 'px-6 py-3'}
+              `}
+            >
+              القائمة
+            </motion.button>
+          </div>
             </motion.div>
           </motion.div>
         )}
