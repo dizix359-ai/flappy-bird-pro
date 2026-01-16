@@ -57,33 +57,16 @@ export const useLeaderboard = () => {
       return true;
     }
 
-    // Check if player already has an entry for this difficulty
-    const { data: existing } = await supabase
-      .from('leaderboard')
-      .select('id, score')
-      .eq('player_name', savedName)
-      .eq('difficulty', difficulty)
-      .maybeSingle();
-
-    // Player has entry - auto update if score is higher
-    if (existing) {
-      if (score > existing.score) {
-        await supabase
-          .from('leaderboard')
-          .update({ score, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-      }
-      return false; // Don't show name input
-    }
-
-    // Player doesn't have entry for this difficulty - auto insert
-    await supabase
-      .from('leaderboard')
-      .insert({
-        player_name: savedName,
-        score,
-        difficulty,
+    // Use secure RPC function to update/insert score
+    try {
+      await supabase.rpc('update_player_score', {
+        p_player_name: savedName,
+        p_score: score,
+        p_difficulty: difficulty,
       });
+    } catch (error) {
+      console.error('Error updating score:', error);
+    }
 
     return false; // Don't show name input
   };
@@ -95,41 +78,31 @@ export const useLeaderboard = () => {
     difficulty: Difficulty
   ): Promise<boolean> => {
     try {
+      // Validate inputs before sending
+      const trimmedName = playerName.trim();
+      if (trimmedName.length < 1 || trimmedName.length > 50) {
+        console.error('Invalid player name length');
+        return false;
+      }
+      
+      if (score < 0 || score > 999999) {
+        console.error('Invalid score');
+        return false;
+      }
+
       // Save player name for future
-      savePlayerName(playerName);
+      savePlayerName(trimmedName);
 
-      const { data: existing } = await supabase
-        .from('leaderboard')
-        .select('id, score')
-        .eq('player_name', playerName)
-        .eq('difficulty', difficulty)
-        .maybeSingle();
+      // Use secure RPC function to update/insert score
+      const { error } = await supabase.rpc('update_player_score', {
+        p_player_name: trimmedName,
+        p_score: score,
+        p_difficulty: difficulty,
+      });
 
-      if (existing) {
-        if (score > existing.score) {
-          const { error } = await supabase
-            .from('leaderboard')
-            .update({ score, updated_at: new Date().toISOString() })
-            .eq('id', existing.id);
-
-          if (error) {
-            console.error('Error updating score:', error);
-            return false;
-          }
-        }
-      } else {
-        const { error } = await supabase
-          .from('leaderboard')
-          .insert({
-            player_name: playerName,
-            score,
-            difficulty,
-          });
-
-        if (error) {
-          console.error('Error inserting score:', error);
-          return false;
-        }
+      if (error) {
+        console.error('Error submitting score:', error);
+        return false;
       }
 
       return true;
