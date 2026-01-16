@@ -110,18 +110,64 @@ export const AngryBirdsGame = () => {
     }
   };
 
-  // Detect mobile
+  // Detect mobile and orientation
   const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
   
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const checkDevice = () => {
+      const mobile = window.innerWidth < 768 || ('ontouchstart' in window && window.innerWidth < 1024);
+      const portrait = window.innerHeight > window.innerWidth;
+      setIsMobile(mobile);
+      setIsPortrait(mobile && portrait);
+    };
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    window.addEventListener('orientationchange', checkDevice);
+    return () => {
+      window.removeEventListener('resize', checkDevice);
+      window.removeEventListener('orientationchange', checkDevice);
+    };
   }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden relative">
+      {/* Portrait Mode Warning */}
+      <AnimatePresence>
+        {isPortrait && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-gradient-to-b from-sky-900 via-sky-800 to-sky-900 flex flex-col items-center justify-center p-6"
+          >
+            <motion.div
+              animate={{ rotate: [0, -90, -90, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="text-8xl mb-8"
+            >
+              📱
+            </motion.div>
+            <h2 className="text-white text-2xl font-bold text-center mb-4">
+              أدر هاتفك للوضع الأفقي
+            </h2>
+            <p className="text-white/70 text-center text-lg mb-6">
+              للحصول على أفضل تجربة لعب
+            </p>
+            <motion.div
+              animate={{ x: [-20, 20, -20] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="text-5xl"
+            >
+              🔄
+            </motion.div>
+            <p className="text-white/50 text-sm mt-8 text-center">
+              Rotate your phone to landscape mode
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Stars */}
