@@ -67,6 +67,7 @@ interface ScreenShake {
 
 export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>(0);
   
   // Audio hooks
@@ -77,6 +78,35 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const [currentBirdIndex, setCurrentBirdIndex] = useState(0);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 950, height: 600 });
+
+  // Detect mobile and resize canvas
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.clientWidth;
+        const aspectRatio = 950 / 600;
+        
+        if (mobile) {
+          // On mobile, use full width with adjusted height
+          const width = Math.min(containerWidth, window.innerWidth - 16);
+          const height = width / aspectRatio;
+          setCanvasSize({ width: Math.floor(width), height: Math.floor(height) });
+        } else {
+          // On desktop, use standard size
+          setCanvasSize({ width: 950, height: 600 });
+        }
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const birdsRef = useRef<AngryBird[]>([]);
   const pigsRef = useRef<Pig[]>([]);
@@ -375,6 +405,18 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     }
   };
 
+  // Scale constants for mobile
+  const getScaledConstants = useCallback(() => {
+    const scale = canvasSize.width / 950;
+    return {
+      slingshotX: SLINGSHOT_X * scale,
+      slingshotY: SLINGSHOT_Y * scale,
+      maxDrag: MAX_DRAG_DISTANCE * scale,
+      groundHeight: GROUND_HEIGHT * scale,
+      touchRadius: isMobile ? 150 : 100, // Larger touch area on mobile
+    };
+  }, [canvasSize, isMobile]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (gameStatus !== 'waiting' && gameStatus !== 'aiming') return;
     
@@ -382,21 +424,22 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     if (!canvas || !currentBirdRef.current) return;
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = 950 / rect.width;  // Always calculate relative to base size
+    const scaleY = 600 / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
     
     const bird = currentBirdRef.current;
     const dist = Math.sqrt((x - bird.x) ** 2 + (y - bird.y) ** 2);
     
-    if (dist < 100) {
+    const touchRadius = isMobile ? 150 : 100; // Larger touch area on mobile
+    if (dist < touchRadius) {
       isDraggingRef.current = true;
       dragCurrentRef.current = { x: bird.x, y: bird.y };
       setGameStatus('aiming');
       audio.playStretch();
     }
-  }, [gameStatus, audio]);
+  }, [gameStatus, audio, isMobile]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDraggingRef.current) return;
@@ -405,8 +448,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = 950 / rect.width;  // Always calculate relative to base size
+    const scaleY = 600 / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
     
@@ -2468,15 +2511,17 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   };
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto">
+    <div ref={containerRef} className="relative w-full max-w-5xl mx-auto px-2 md:px-0">
       <canvas
         ref={canvasRef}
         width={950}
         height={600}
-        className="w-full rounded-3xl shadow-2xl cursor-crosshair"
+        className="w-full rounded-2xl md:rounded-3xl shadow-2xl cursor-crosshair"
         style={{ 
           touchAction: 'none',
-          boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(139, 90, 43, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
+          boxShadow: isMobile 
+            ? '0 15px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(139, 90, 43, 0.5)'
+            : '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(139, 90, 43, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -2488,45 +2533,84 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         onTouchEnd={handleTouchEnd}
       />
       
-      {/* Control Buttons */}
-      <div className="absolute top-6 left-6 flex gap-3">
-        {/* Back button */}
-        <button
-          onClick={onBackToMenu}
-          className="bg-black/70 hover:bg-black/85 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
-        >
-          <span className="text-xl">←</span>
-          <span>رجوع</span>
-        </button>
-        
-        {/* Restart button */}
-        <button
-          onClick={handleRestart}
-          className="bg-amber-600/80 hover:bg-amber-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
-        >
-          <span className="text-xl">🔄</span>
-          <span>إعادة</span>
-        </button>
-        
-        {/* Pause button */}
-        <button
-          onClick={() => setIsPaused(true)}
-          className="bg-blue-600/80 hover:bg-blue-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
-        >
-          <span className="text-xl">⏸️</span>
-          <span>إيقاف</span>
-        </button>
-      </div>
+      {/* Mobile Control Buttons - Bottom positioned */}
+      {isMobile ? (
+        <div className="absolute bottom-2 left-2 right-2 flex justify-between gap-2">
+          <button
+            onClick={onBackToMenu}
+            className="bg-black/80 active:bg-black backdrop-blur-xl p-3 rounded-xl text-white font-bold transition-all flex items-center justify-center border border-white/20 shadow-lg flex-1 min-h-[48px]"
+          >
+            <span className="text-2xl">←</span>
+          </button>
+          
+          <button
+            onClick={handleRestart}
+            className="bg-amber-600/90 active:bg-amber-600 backdrop-blur-xl p-3 rounded-xl text-white font-bold transition-all flex items-center justify-center border border-white/20 shadow-lg flex-1 min-h-[48px]"
+          >
+            <span className="text-2xl">🔄</span>
+          </button>
+          
+          <button
+            onClick={() => setIsPaused(true)}
+            className="bg-blue-600/90 active:bg-blue-600 backdrop-blur-xl p-3 rounded-xl text-white font-bold transition-all flex items-center justify-center border border-white/20 shadow-lg flex-1 min-h-[48px]"
+          >
+            <span className="text-2xl">⏸️</span>
+          </button>
+          
+          {/* Special ability button for mobile */}
+          {gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && !isPaused && (
+            <button
+              onClick={handleClick}
+              className="bg-gradient-to-r from-amber-500 to-red-500 active:from-amber-600 active:to-red-600 backdrop-blur-xl p-3 rounded-xl text-white font-bold transition-all flex items-center justify-center border border-white/30 shadow-lg flex-1 min-h-[48px] animate-pulse"
+            >
+              <span className="text-2xl">⚡</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Desktop Control Buttons */}
+          <div className="absolute top-6 left-6 flex gap-3">
+            <button
+              onClick={onBackToMenu}
+              className="bg-black/70 hover:bg-black/85 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+            >
+              <span className="text-xl">←</span>
+              <span>رجوع</span>
+            </button>
+            
+            <button
+              onClick={handleRestart}
+              className="bg-amber-600/80 hover:bg-amber-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+            >
+              <span className="text-xl">🔄</span>
+              <span>إعادة</span>
+            </button>
+            
+            <button
+              onClick={() => setIsPaused(true)}
+              className="bg-blue-600/80 hover:bg-blue-600 backdrop-blur-xl px-5 py-3.5 rounded-2xl text-white font-bold transition-all flex items-center gap-2 border border-white/25 shadow-xl hover:scale-105"
+            >
+              <span className="text-xl">⏸️</span>
+              <span>إيقاف</span>
+            </button>
+          </div>
+        </>
+      )}
       
-      {/* Instructions */}
+      {/* Instructions - Adjusted for mobile */}
       {gameStatus === 'waiting' && !isPaused && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-black/75 to-black/60 backdrop-blur-xl px-12 py-6 rounded-3xl text-white text-center border border-white/25 shadow-2xl">
-          <span className="text-xl font-semibold">🎯 اسحب الطائر للخلف ثم أفلت للإطلاق!</span>
+        <div className={`absolute left-1/2 -translate-x-1/2 bg-gradient-to-r from-black/75 to-black/60 backdrop-blur-xl rounded-2xl md:rounded-3xl text-white text-center border border-white/25 shadow-2xl
+          ${isMobile ? 'bottom-16 px-4 py-3' : 'bottom-8 px-12 py-6'}
+        `}>
+          <span className={`font-semibold ${isMobile ? 'text-sm' : 'text-xl'}`}>
+            🎯 {isMobile ? 'اسحب الطائر وأفلت!' : 'اسحب الطائر للخلف ثم أفلت للإطلاق!'}
+          </span>
         </div>
       )}
       
-      {/* Special ability hint */}
-      {gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && !isPaused && (
+      {/* Special ability hint - Desktop only */}
+      {!isMobile && gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && !isPaused && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 backdrop-blur-xl px-10 py-5 rounded-2xl text-white font-bold animate-pulse shadow-2xl border border-white/35">
           ⚡ اضغط لتفعيل القدرة الخاصة! ⚡
         </div>
@@ -2534,39 +2618,44 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       
       {/* Pause Screen */}
       {isPaused && gameStatus !== 'finished' && (
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center rounded-3xl z-50">
-          <div className="text-center text-white p-12">
-            <h2 className="text-6xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 drop-shadow-lg">
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center rounded-2xl md:rounded-3xl z-50 p-4">
+          <div className="text-center text-white">
+            <h2 className={`font-black mb-6 md:mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 drop-shadow-lg
+              ${isMobile ? 'text-3xl' : 'text-6xl'}
+            `}>
               ⏸️ إيقاف مؤقت ⏸️
             </h2>
             
-            <div className="flex flex-col gap-4">
-              {/* Resume button */}
+            <div className="flex flex-col gap-3 md:gap-4">
               <button
                 onClick={() => setIsPaused(false)}
-                className="bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+                className={`bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                `}
               >
                 ▶️ متابعة اللعب
               </button>
               
-              {/* Restart button */}
               <button
                 onClick={() => {
                   setIsPaused(false);
                   handleRestart();
                 }}
-                className="bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                `}
               >
                 🔄 إعادة المستوى
               </button>
               
-              {/* Back to menu button */}
               <button
                 onClick={() => {
                   setIsPaused(false);
                   onBackToMenu();
                 }}
-                className="bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                `}
               >
                 ← العودة للقائمة
               </button>
@@ -2577,33 +2666,43 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       
       {/* Game Over */}
       {gameStatus === 'finished' && (
-        <div className="absolute inset-0 bg-black/88 backdrop-blur-md flex items-center justify-center rounded-3xl">
-          <div className="text-center text-white p-12">
+        <div className="absolute inset-0 bg-black/88 backdrop-blur-md flex items-center justify-center rounded-2xl md:rounded-3xl p-4">
+          <div className="text-center text-white">
             {pigsRef.current.length === 0 ? (
               <>
-                <h2 className="text-7xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 animate-pulse drop-shadow-lg">
+                <h2 className={`font-black mb-6 md:mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 animate-pulse drop-shadow-lg
+                  ${isMobile ? 'text-4xl' : 'text-7xl'}
+                `}>
                   🎉 فوز! 🎉
                 </h2>
-                <p className="text-5xl mb-10 font-bold">
+                <p className={`mb-6 md:mb-10 font-bold ${isMobile ? 'text-2xl' : 'text-5xl'}`}>
                   النتيجة: <span className="text-amber-400">{score.toLocaleString()}</span>
                 </p>
               </>
             ) : (
               <>
-                <h2 className="text-6xl font-black mb-8 text-red-400">😢 انتهت الطيور!</h2>
-                <p className="text-2xl mb-10 text-white/75">لا تستسلم، حاول مرة أخرى!</p>
+                <h2 className={`font-black mb-4 md:mb-8 text-red-400 ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+                  😢 انتهت الطيور!
+                </h2>
+                <p className={`mb-6 md:mb-10 text-white/75 ${isMobile ? 'text-lg' : 'text-2xl'}`}>
+                  لا تستسلم، حاول مرة أخرى!
+                </p>
               </>
             )}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 md:gap-4">
               <button
                 onClick={handleRestart}
-                className="bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                `}
               >
                 🔄 إعادة المستوى
               </button>
               <button
                 onClick={onBackToMenu}
-                className="bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 px-14 py-6 rounded-3xl font-black text-2xl hover:scale-105 transition-transform shadow-2xl border-2 border-white/25"
+                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                `}
               >
                 العودة للقائمة
               </button>
