@@ -134,8 +134,8 @@ export const AngryBirdsGame = () => {
   const isMobileLandscape = isMobile && !isPortrait;
 
   return (
-    <div className={`min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center overflow-hidden relative
-      ${isMobileLandscape ? 'p-0' : 'p-2 md:p-4'}
+    <div className={`min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center relative
+      ${isMobileLandscape ? 'p-0 overflow-hidden justify-center' : 'p-2 md:p-4 overflow-y-auto justify-start pt-8'}
     `}>
       {/* Portrait Mode Warning */}
       <AnimatePresence>
