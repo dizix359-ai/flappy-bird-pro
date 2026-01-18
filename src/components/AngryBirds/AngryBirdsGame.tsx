@@ -135,43 +135,8 @@ export const AngryBirdsGame = () => {
 
   return (
     <div className={`min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center relative
-      ${isMobileLandscape ? 'p-0 overflow-hidden justify-center' : 'p-2 md:p-4 overflow-y-auto justify-start pt-8'}
+      ${isMobileLandscape ? 'p-0 overflow-hidden justify-center h-screen w-screen fixed inset-0' : 'p-2 md:p-4 overflow-y-auto justify-start pt-4 pb-8'}
     `}>
-      {/* Portrait Mode Warning */}
-      <AnimatePresence>
-        {isPortrait && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-gradient-to-b from-sky-900 via-sky-800 to-sky-900 flex flex-col items-center justify-center p-6"
-          >
-            <motion.div
-              animate={{ rotate: [0, -90, -90, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="text-8xl mb-8"
-            >
-              📱
-            </motion.div>
-            <h2 className="text-white text-2xl font-bold text-center mb-4">
-              أدر هاتفك للوضع الأفقي
-            </h2>
-            <p className="text-white/70 text-center text-lg mb-6">
-              للحصول على أفضل تجربة لعب
-            </p>
-            <motion.div
-              animate={{ x: [-20, 20, -20] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-5xl"
-            >
-              🔄
-            </motion.div>
-            <p className="text-white/50 text-sm mt-8 text-center">
-              Rotate your phone to landscape mode
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -226,7 +191,7 @@ export const AngryBirdsGame = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-5xl z-10 px-2"
+            className="w-full max-w-5xl z-10 px-2 pb-12"
           >
             {/* Header */}
             <div className="text-center mb-4 md:mb-8">
@@ -310,7 +275,7 @@ export const AngryBirdsGame = () => {
             )}
 
             {/* Levels Grid */}
-            <div className={`grid gap-3 md:gap-6 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-3'}`}>
+            <div className={`grid gap-3 md:gap-6 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-3'} mb-6`}>
               {LEVELS.map((level, index) => {
                 const isUnlocked = progress.unlockedLevels.includes(level.id);
                 const stars = progress.levelStars[level.id] || 0;
