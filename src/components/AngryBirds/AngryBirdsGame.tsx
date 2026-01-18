@@ -130,8 +130,13 @@ export const AngryBirdsGame = () => {
     };
   }, []);
 
+  // Check if in landscape mobile mode for fullscreen gameplay
+  const isMobileLandscape = isMobile && !isPortrait;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden relative">
+    <div className={`min-h-screen bg-gradient-to-b from-sky-900 via-sky-700 to-emerald-600 flex flex-col items-center justify-center overflow-hidden relative
+      ${isMobileLandscape ? 'p-0' : 'p-2 md:p-4'}
+    `}>
       {/* Portrait Mode Warning */}
       <AnimatePresence>
         {isPortrait && (

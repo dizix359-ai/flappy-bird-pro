@@ -79,33 +79,26 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 950, height: 600 });
+  const [isLandscape, setIsLandscape] = useState(false);
 
-  // Detect mobile and resize canvas
+  // Detect mobile and orientation
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
+    const checkDevice = () => {
+      const mobile = window.innerWidth < 1024 || ('ontouchstart' in window);
+      const landscape = window.innerWidth > window.innerHeight;
       setIsMobile(mobile);
-      
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.clientWidth;
-        const aspectRatio = 950 / 600;
-        
-        if (mobile) {
-          // On mobile, use full width with adjusted height
-          const width = Math.min(containerWidth, window.innerWidth - 16);
-          const height = width / aspectRatio;
-          setCanvasSize({ width: Math.floor(width), height: Math.floor(height) });
-        } else {
-          // On desktop, use standard size
-          setCanvasSize({ width: 950, height: 600 });
-        }
-      }
+      setIsLandscape(landscape);
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(checkDevice, 100);
+    });
+    return () => {
+      window.removeEventListener('resize', checkDevice);
+      window.removeEventListener('orientationchange', checkDevice);
+    };
   }, []);
   
   const birdsRef = useRef<AngryBird[]>([]);
@@ -405,18 +398,6 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     }
   };
 
-  // Scale constants for mobile
-  const getScaledConstants = useCallback(() => {
-    const scale = canvasSize.width / 950;
-    return {
-      slingshotX: SLINGSHOT_X * scale,
-      slingshotY: SLINGSHOT_Y * scale,
-      maxDrag: MAX_DRAG_DISTANCE * scale,
-      groundHeight: GROUND_HEIGHT * scale,
-      touchRadius: isMobile ? 150 : 100, // Larger touch area on mobile
-    };
-  }, [canvasSize, isMobile]);
-
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (gameStatus !== 'waiting' && gameStatus !== 'aiming') return;
     
@@ -424,7 +405,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     if (!canvas || !currentBirdRef.current) return;
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = 950 / rect.width;  // Always calculate relative to base size
+    const scaleX = 950 / rect.width;
     const scaleY = 600 / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
@@ -432,7 +413,8 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     const bird = currentBirdRef.current;
     const dist = Math.sqrt((x - bird.x) ** 2 + (y - bird.y) ** 2);
     
-    const touchRadius = isMobile ? 150 : 100; // Larger touch area on mobile
+    // Much larger touch area on mobile for easier aiming
+    const touchRadius = isMobile ? 200 : 100;
     if (dist < touchRadius) {
       isDraggingRef.current = true;
       dragCurrentRef.current = { x: bird.x, y: bird.y };
@@ -2510,17 +2492,31 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     return `rgb(${r}, ${g}, ${b})`;
   };
 
+  // Mobile landscape mode - optimized UI
+  const isMobileLandscape = isMobile && isLandscape;
+
   return (
-    <div ref={containerRef} className="relative w-full max-w-5xl mx-auto px-2 md:px-0">
+    <div 
+      ref={containerRef} 
+      className={`relative mx-auto ${isMobileLandscape ? 'w-full h-full' : 'w-full max-w-5xl px-2 md:px-0'}`}
+      style={isMobileLandscape ? { 
+        maxHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      } : {}}
+    >
       <canvas
         ref={canvasRef}
         width={950}
         height={600}
-        className="w-full rounded-2xl md:rounded-3xl shadow-2xl cursor-crosshair"
+        className={`rounded-xl shadow-2xl cursor-crosshair ${isMobileLandscape ? 'max-h-[85vh]' : 'w-full md:rounded-3xl'}`}
         style={{ 
           touchAction: 'none',
+          width: isMobileLandscape ? 'auto' : '100%',
+          height: isMobileLandscape ? '85vh' : 'auto',
           boxShadow: isMobile 
-            ? '0 15px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(139, 90, 43, 0.5)'
+            ? '0 8px 20px -8px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(139, 90, 43, 0.5)'
             : '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(139, 90, 43, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
         }}
         onMouseDown={handleMouseDown}
@@ -2533,8 +2529,45 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         onTouchEnd={handleTouchEnd}
       />
       
-      {/* Mobile Control Buttons - Bottom positioned */}
-      {isMobile ? (
+      {/* Mobile Landscape Controls - Side positioned for better gameplay */}
+      {isMobileLandscape ? (
+        <>
+          {/* Left side controls */}
+          <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
+            <button
+              onClick={onBackToMenu}
+              className="bg-black/70 active:bg-black backdrop-blur-md w-10 h-10 rounded-lg text-white font-bold flex items-center justify-center border border-white/20 shadow-lg"
+            >
+              <span className="text-lg">←</span>
+            </button>
+            
+            <button
+              onClick={handleRestart}
+              className="bg-amber-600/80 active:bg-amber-600 backdrop-blur-md w-10 h-10 rounded-lg text-white font-bold flex items-center justify-center border border-white/20 shadow-lg"
+            >
+              <span className="text-lg">🔄</span>
+            </button>
+            
+            <button
+              onClick={() => setIsPaused(true)}
+              className="bg-blue-600/80 active:bg-blue-600 backdrop-blur-md w-10 h-10 rounded-lg text-white font-bold flex items-center justify-center border border-white/20 shadow-lg"
+            >
+              <span className="text-lg">⏸️</span>
+            </button>
+          </div>
+          
+          {/* Right side - Special ability button */}
+          {gameStatus === 'flying' && currentBirdRef.current && !currentBirdRef.current.specialUsed && currentBirdRef.current.type !== 'red' && !isPaused && (
+            <button
+              onClick={handleClick}
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-b from-amber-500 to-red-500 active:from-amber-600 active:to-red-600 backdrop-blur-md w-14 h-20 rounded-xl text-white font-bold flex items-center justify-center border border-white/30 shadow-lg animate-pulse"
+            >
+              <span className="text-3xl">⚡</span>
+            </button>
+          )}
+        </>
+      ) : isMobile ? (
+        // Mobile Portrait Controls - bottom positioned
         <div className="absolute bottom-2 left-2 right-2 flex justify-between gap-2">
           <button
             onClick={onBackToMenu}
@@ -2598,13 +2631,17 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         </>
       )}
       
-      {/* Instructions - Adjusted for mobile */}
+      {/* Instructions - Optimized for mobile landscape */}
       {gameStatus === 'waiting' && !isPaused && (
-        <div className={`absolute left-1/2 -translate-x-1/2 bg-gradient-to-r from-black/75 to-black/60 backdrop-blur-xl rounded-2xl md:rounded-3xl text-white text-center border border-white/25 shadow-2xl
-          ${isMobile ? 'bottom-16 px-4 py-3' : 'bottom-8 px-12 py-6'}
+        <div className={`absolute left-1/2 -translate-x-1/2 bg-gradient-to-r from-black/75 to-black/60 backdrop-blur-xl text-white text-center border border-white/25 shadow-2xl
+          ${isMobileLandscape 
+            ? 'bottom-2 px-3 py-1.5 rounded-lg' 
+            : isMobile 
+              ? 'bottom-16 px-4 py-3 rounded-2xl' 
+              : 'bottom-8 px-12 py-6 rounded-3xl'}
         `}>
-          <span className={`font-semibold ${isMobile ? 'text-sm' : 'text-xl'}`}>
-            🎯 {isMobile ? 'اسحب الطائر وأفلت!' : 'اسحب الطائر للخلف ثم أفلت للإطلاق!'}
+          <span className={`font-semibold ${isMobileLandscape ? 'text-xs' : isMobile ? 'text-sm' : 'text-xl'}`}>
+            🎯 {isMobileLandscape ? 'اسحب الطائر!' : isMobile ? 'اسحب الطائر وأفلت!' : 'اسحب الطائر للخلف ثم أفلت للإطلاق!'}
           </span>
         </div>
       )}
@@ -2616,24 +2653,28 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         </div>
       )}
       
-      {/* Pause Screen */}
+      {/* Pause Screen - Optimized for mobile landscape */}
       {isPaused && gameStatus !== 'finished' && (
-        <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center rounded-2xl md:rounded-3xl z-50 p-4">
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center rounded-xl md:rounded-3xl z-50 p-2">
           <div className="text-center text-white">
-            <h2 className={`font-black mb-6 md:mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 drop-shadow-lg
-              ${isMobile ? 'text-3xl' : 'text-6xl'}
+            <h2 className={`font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 drop-shadow-lg
+              ${isMobileLandscape ? 'text-xl mb-3' : isMobile ? 'text-3xl mb-6' : 'text-6xl mb-10'}
             `}>
               ⏸️ إيقاف مؤقت ⏸️
             </h2>
             
-            <div className="flex flex-col gap-3 md:gap-4">
+            <div className={`flex gap-2 ${isMobileLandscape ? 'flex-row' : 'flex-col gap-3 md:gap-4'}`}>
               <button
                 onClick={() => setIsPaused(false)}
-                className={`bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
-                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                className={`bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobileLandscape 
+                    ? 'px-4 py-2 text-sm rounded-xl' 
+                    : isMobile 
+                      ? 'px-8 py-4 text-lg rounded-2xl' 
+                      : 'px-14 py-6 text-2xl rounded-3xl'}
                 `}
               >
-                ▶️ متابعة اللعب
+                ▶️ {isMobileLandscape ? 'متابعة' : 'متابعة اللعب'}
               </button>
               
               <button
@@ -2641,11 +2682,15 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
                   setIsPaused(false);
                   handleRestart();
                 }}
-                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
-                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobileLandscape 
+                    ? 'px-4 py-2 text-sm rounded-xl' 
+                    : isMobile 
+                      ? 'px-8 py-4 text-lg rounded-2xl' 
+                      : 'px-14 py-6 text-2xl rounded-3xl'}
                 `}
               >
-                🔄 إعادة المستوى
+                🔄 {isMobileLandscape ? 'إعادة' : 'إعادة المستوى'}
               </button>
               
               <button
@@ -2653,58 +2698,70 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
                   setIsPaused(false);
                   onBackToMenu();
                 }}
-                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
-                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobileLandscape 
+                    ? 'px-4 py-2 text-sm rounded-xl' 
+                    : isMobile 
+                      ? 'px-8 py-4 text-lg rounded-2xl' 
+                      : 'px-14 py-6 text-2xl rounded-3xl'}
                 `}
               >
-                ← العودة للقائمة
+                ← {isMobileLandscape ? 'القائمة' : 'العودة للقائمة'}
               </button>
             </div>
           </div>
         </div>
       )}
       
-      {/* Game Over */}
+      {/* Game Over - Optimized for mobile landscape */}
       {gameStatus === 'finished' && (
-        <div className="absolute inset-0 bg-black/88 backdrop-blur-md flex items-center justify-center rounded-2xl md:rounded-3xl p-4">
+        <div className="absolute inset-0 bg-black/88 backdrop-blur-md flex items-center justify-center rounded-xl md:rounded-3xl p-2">
           <div className="text-center text-white">
             {pigsRef.current.length === 0 ? (
               <>
-                <h2 className={`font-black mb-6 md:mb-10 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 animate-pulse drop-shadow-lg
-                  ${isMobile ? 'text-4xl' : 'text-7xl'}
+                <h2 className={`font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 animate-pulse drop-shadow-lg
+                  ${isMobileLandscape ? 'text-2xl mb-2' : isMobile ? 'text-4xl mb-6' : 'text-7xl mb-10'}
                 `}>
                   🎉 فوز! 🎉
                 </h2>
-                <p className={`mb-6 md:mb-10 font-bold ${isMobile ? 'text-2xl' : 'text-5xl'}`}>
+                <p className={`font-bold ${isMobileLandscape ? 'text-lg mb-3' : isMobile ? 'text-2xl mb-6' : 'text-5xl mb-10'}`}>
                   النتيجة: <span className="text-amber-400">{score.toLocaleString()}</span>
                 </p>
               </>
             ) : (
               <>
-                <h2 className={`font-black mb-4 md:mb-8 text-red-400 ${isMobile ? 'text-3xl' : 'text-6xl'}`}>
+                <h2 className={`font-black text-red-400 ${isMobileLandscape ? 'text-xl mb-2' : isMobile ? 'text-3xl mb-4' : 'text-6xl mb-8'}`}>
                   😢 انتهت الطيور!
                 </h2>
-                <p className={`mb-6 md:mb-10 text-white/75 ${isMobile ? 'text-lg' : 'text-2xl'}`}>
+                <p className={`text-white/75 ${isMobileLandscape ? 'text-sm mb-3' : isMobile ? 'text-lg mb-6' : 'text-2xl mb-10'}`}>
                   لا تستسلم، حاول مرة أخرى!
                 </p>
               </>
             )}
-            <div className="flex flex-col gap-3 md:gap-4">
+            <div className={`flex gap-2 ${isMobileLandscape ? 'flex-row justify-center' : 'flex-col gap-3 md:gap-4'}`}>
               <button
                 onClick={handleRestart}
-                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
-                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                className={`bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobileLandscape 
+                    ? 'px-4 py-2 text-sm rounded-xl' 
+                    : isMobile 
+                      ? 'px-8 py-4 text-lg rounded-2xl' 
+                      : 'px-14 py-6 text-2xl rounded-3xl'}
                 `}
               >
-                🔄 إعادة المستوى
+                🔄 {isMobileLandscape ? 'إعادة' : 'إعادة المستوى'}
               </button>
               <button
                 onClick={onBackToMenu}
-                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 rounded-2xl md:rounded-3xl font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
-                  ${isMobile ? 'px-8 py-4 text-lg' : 'px-14 py-6 text-2xl'}
+                className={`bg-gradient-to-r from-slate-500 via-slate-600 to-slate-500 font-black active:scale-95 md:hover:scale-105 transition-transform shadow-2xl border-2 border-white/25
+                  ${isMobileLandscape 
+                    ? 'px-4 py-2 text-sm rounded-xl' 
+                    : isMobile 
+                      ? 'px-8 py-4 text-lg rounded-2xl' 
+                      : 'px-14 py-6 text-2xl rounded-3xl'}
                 `}
               >
-                العودة للقائمة
+                {isMobileLandscape ? '← القائمة' : 'العودة للقائمة'}
               </button>
             </div>
           </div>
