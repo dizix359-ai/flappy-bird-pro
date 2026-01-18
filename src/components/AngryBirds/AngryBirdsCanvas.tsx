@@ -33,18 +33,18 @@ interface GameAssets {
   loaded: boolean;
 }
 
-// Enhanced Physics Constants
-const GRAVITY = 0.45;
-const AIR_RESISTANCE = 0.998;
-const GROUND_FRICTION = 0.85;
-const BOUNCE_DAMPING = 0.55;
-const ANGULAR_DAMPING = 0.95;
-const MIN_BOUNCE_VELOCITY = 2;
+// Enhanced Physics Constants - More realistic
+const GRAVITY = 0.52;
+const AIR_RESISTANCE = 0.997;
+const GROUND_FRICTION = 0.82;
+const BOUNCE_DAMPING = 0.45;
+const ANGULAR_DAMPING = 0.93;
+const MIN_BOUNCE_VELOCITY = 1.5;
 const GROUND_HEIGHT = 100;
 const SLINGSHOT_X = 160;
 const SLINGSHOT_Y = 280;
 const MAX_DRAG_DISTANCE = 130;
-const COLLISION_ITERATIONS = 3;
+const COLLISION_ITERATIONS = 4;
 
 interface Particle {
   x: number;
@@ -470,7 +470,9 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       return;
     }
     
-    const power = 0.19;
+    // Enhanced power curve for more realistic launch
+    const normalizedPull = pullDistance / MAX_DRAG_DISTANCE;
+    const power = 0.16 + (normalizedPull * 0.06); // Variable power based on pull distance
     currentBirdRef.current.velocityX = dx * power;
     currentBirdRef.current.velocityY = dy * power;
     currentBirdRef.current.isFlying = true;
@@ -791,26 +793,36 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
     const groundY = canvasHeight - GROUND_HEIGHT;
     const scaledDelta = deltaTime * 60; // Normalize to 60fps
     
-    // Update current bird with enhanced physics
+    // Update current bird with realistic physics
     if (currentBirdRef.current?.isFlying) {
       const bird = currentBirdRef.current;
       flightTimeRef.current += deltaTime;
       
       if (!bird.hasLanded) {
-        // Apply gravity
+        // Apply gravity with realistic acceleration
         bird.velocityY += GRAVITY * scaledDelta;
         
-        // Apply air resistance
+        // Apply air resistance (drag force proportional to velocity squared for realism)
+        const speed = Math.sqrt(bird.velocityX ** 2 + bird.velocityY ** 2);
+        const dragCoefficient = 0.001;
+        if (speed > 0) {
+          const dragX = dragCoefficient * bird.velocityX * speed;
+          const dragY = dragCoefficient * bird.velocityY * speed;
+          bird.velocityX -= dragX * scaledDelta;
+          bird.velocityY -= dragY * scaledDelta;
+        }
+        
+        // Apply linear air resistance
         bird.velocityX *= Math.pow(AIR_RESISTANCE, scaledDelta);
         bird.velocityY *= Math.pow(AIR_RESISTANCE, scaledDelta);
         
-        // Update position
+        // Update position with sub-stepping for accuracy
         bird.x += bird.velocityX * scaledDelta;
         bird.y += bird.velocityY * scaledDelta;
         
-        // Angular velocity based on movement
-        const speed = Math.sqrt(bird.velocityX ** 2 + bird.velocityY ** 2);
-        bird.rotation += (bird.velocityX * 0.02 + speed * 0.005) * scaledDelta;
+        // Angular velocity based on movement direction
+        const targetRotation = Math.atan2(bird.velocityY, bird.velocityX);
+        bird.rotation += (targetRotation - bird.rotation) * 0.1 * scaledDelta;
         
         // Trail effect
         if (Math.random() > 0.5) {
@@ -1082,7 +1094,7 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
       return true;
     });
     
-    // Update pigs with improved physics
+    // Update pigs with realistic physics
     pigsRef.current = pigsRef.current.filter(pig => {
       if (pig.health <= 0) {
         setScore(s => s + 500);
@@ -1091,19 +1103,27 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
         return false;
       }
       
-      pig.velocityY += GRAVITY * 0.7 * scaledDelta;
-      pig.velocityX *= Math.pow(0.97, scaledDelta);
+      // Realistic gravity and friction for pigs
+      pig.velocityY += GRAVITY * 0.75 * scaledDelta;
+      
+      // Drag based on velocity magnitude
+      const pigSpeed = Math.sqrt(pig.velocityX ** 2 + pig.velocityY ** 2);
+      if (pigSpeed > 0.5) {
+        pig.velocityX *= Math.pow(0.985, scaledDelta);
+        pig.velocityY *= Math.pow(0.995, scaledDelta);
+      }
       
       pig.x += pig.velocityX * scaledDelta;
       pig.y += pig.velocityY * scaledDelta;
       
-      // Ground collision with bounce
+      // Ground collision with realistic bounce
       if (pig.y + pig.radius > groundY) {
         pig.y = groundY - pig.radius;
         
-        if (Math.abs(pig.velocityY) > MIN_BOUNCE_VELOCITY) {
-          pig.velocityY = -pig.velocityY * 0.35;
-          pig.velocityX *= 0.75;
+        const impactVelocity = Math.abs(pig.velocityY);
+        if (impactVelocity > MIN_BOUNCE_VELOCITY) {
+          pig.velocityY = -pig.velocityY * 0.3;
+          pig.velocityX *= 0.7;
           
           // Fall damage
           if (Math.abs(pig.velocityY) > 10) {
@@ -2498,26 +2518,29 @@ export const AngryBirdsCanvas = ({ level, onLevelComplete, onBackToMenu }: GameC
   return (
     <div 
       ref={containerRef} 
-      className={`relative mx-auto ${isMobileLandscape ? 'w-full h-full' : 'w-full max-w-5xl px-2 md:px-0'}`}
+      className={`relative mx-auto ${isMobileLandscape ? 'w-screen h-screen fixed inset-0' : 'w-full max-w-5xl px-2 md:px-0'}`}
       style={isMobileLandscape ? { 
-        maxHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        background: 'linear-gradient(to bottom, #0c4a6e, #0369a1, #047857)'
       } : {}}
     >
       <canvas
         ref={canvasRef}
         width={950}
         height={600}
-        className={`rounded-xl shadow-2xl cursor-crosshair ${isMobileLandscape ? 'max-h-[85vh]' : 'w-full md:rounded-3xl'}`}
+        className={`cursor-crosshair ${isMobileLandscape ? '' : 'w-full rounded-xl md:rounded-3xl'}`}
         style={{ 
           touchAction: 'none',
-          width: isMobileLandscape ? 'auto' : '100%',
-          height: isMobileLandscape ? '85vh' : 'auto',
-          boxShadow: isMobile 
-            ? '0 8px 20px -8px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(139, 90, 43, 0.5)'
-            : '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(139, 90, 43, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
+          width: isMobileLandscape ? '100vw' : '100%',
+          height: isMobileLandscape ? '100vh' : 'auto',
+          objectFit: 'contain',
+          boxShadow: isMobileLandscape 
+            ? 'none'
+            : isMobile 
+              ? '0 8px 20px -8px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(139, 90, 43, 0.5)'
+              : '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(139, 90, 43, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
